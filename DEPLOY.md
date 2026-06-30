@@ -1,3 +1,4 @@
+[DEPLOY.md](https://github.com/user-attachments/files/29526032/DEPLOY.md)
 # Deploying the DiffSinger Cloud Engine
 
 This is the part I genuinely can't do from this sandbox — no outbound network access, no GPU, and no ability to SSH into RunPod/Vast.ai/GCP on your behalf. Everything below is real, runnable, and matches the architecture you sent, with a few corrections. You'll need to run it yourself on a machine you control.
