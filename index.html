@@ -21,6 +21,17 @@
   --good:#57c98a;
   --warn:#e8a861;
   --bad:#ef7f7f;
+
+  --iri-violet:#b48cf2;
+  --iri-blue:#7fb2f0;
+  --iri-teal:#6be0c8;
+  --iri-pink:#f0a0d6;
+  --iridescent: linear-gradient(115deg, var(--iri-violet), var(--iri-blue), var(--iri-teal), var(--iri-pink), var(--iri-violet));
+}
+
+@keyframes shimmer{
+  0%,100%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
 }
 
 *{box-sizing:border-box;}
@@ -78,8 +89,9 @@ body{
 .panel-label::before{
   content:'';
   width:6px;height:6px;border-radius:50%;
-  background:var(--accent);
-  box-shadow:0 0 0 4px rgba(108,121,239,0.16);
+  background:var(--iridescent);
+  background-size:300% 300%;
+  animation:shimmer 9s ease-in-out infinite;
   flex-shrink:0;
 }
 
@@ -134,12 +146,14 @@ body{
 .btn.record{color:var(--bad);}
 .btn.record.active{background:var(--bad);color:#fff;animation:pulse 1.4s infinite;}
 .btn.amber{
-  background:linear-gradient(135deg,var(--accent),var(--accent-deep));
+  background:var(--iridescent);
+  background-size:300% 300%;
+  animation:shimmer 10s ease-in-out infinite;
   color:#fff;
-  box-shadow:6px 6px 16px rgba(92,103,224,0.4), -4px -4px 10px var(--shadow-light);
+  box-shadow:6px 6px 16px rgba(140,120,220,0.4), -4px -4px 10px var(--shadow-light);
 }
 .btn.amber:active{
-  box-shadow:inset 4px 4px 9px rgba(58,67,170,0.45), inset -3px -3px 7px rgba(255,255,255,0.2);
+  box-shadow:inset 4px 4px 9px rgba(90,70,170,0.45), inset -3px -3px 7px rgba(255,255,255,0.2);
 }
 .btn.small{padding:8px 13px;font-size:11px;border-radius:11px;}
 @keyframes pulse{
@@ -159,8 +173,10 @@ body{
   transition:background .25s ease, box-shadow .25s ease;
 }
 .lever.on{
-  background:linear-gradient(135deg,var(--accent),var(--accent-deep));
-  box-shadow:inset 3px 3px 7px rgba(50,58,150,0.45), inset -2px -2px 6px rgba(255,255,255,0.15);
+  background:var(--iridescent);
+  background-size:300% 300%;
+  animation:shimmer 8s ease-in-out infinite;
+  box-shadow:inset 3px 3px 7px rgba(90,70,170,0.4), inset -2px -2px 6px rgba(255,255,255,0.15);
 }
 .lever .handle{
   position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;
@@ -225,22 +241,50 @@ body{
 }
 .strip-status{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1px;color:var(--ink-soft);min-height:11px;text-align:center;}
 
-.knob-row{display:flex;gap:10px;}
-.knob-wrap{position:relative;width:46px;height:46px;display:flex;flex-direction:column;align-items:center;}
+.knob-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+.knob-wrap{position:relative;width:58px;height:58px;display:flex;flex-direction:column;align-items:center;}
+.knob-dial{position:relative;width:58px;height:58px;}
+.knob-track,.knob-fill{
+  position:absolute;inset:0;border-radius:50%;
+  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+  mask:radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+}
+.knob-track{
+  background:conic-gradient(from -135deg, var(--shadow-dark) 0deg 270deg, transparent 270deg 360deg);
+  opacity:.55;
+}
+.knob-fill{
+  background:conic-gradient(from -135deg, var(--iri-violet), var(--iri-blue), var(--iri-teal) var(--fill,0deg), transparent var(--fill,0deg) 360deg);
+}
+.knob-ticks span{
+  position:absolute;left:50%;top:50%;width:2px;height:5px;border-radius:1px;
+  background:var(--shadow-dark);
+  transform:translate(-50%,-50%) rotate(var(--t,0deg)) translateY(-25px);
+}
 .knob{
-  width:42px;height:42px;border-radius:50%;
+  position:absolute;inset:9px;border-radius:50%;
   background:var(--surface);
   box-shadow:5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
-  position:relative;
 }
 .knob .pointer{
-  position:absolute;left:50%;top:5px;width:3px;height:13px;
-  background:var(--accent-deep);border-radius:2px;
-  transform-origin:50% 16px;
-  transform:translateX(-50%) rotate(var(--rot,0deg));
+  position:absolute;inset:0;
+  transform:rotate(var(--rot,-135deg));
 }
-.knob-select{position:absolute;top:0;left:0;width:42px;height:42px;opacity:0;cursor:pointer;}
-.knob-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--accent-deep);letter-spacing:.3px;text-align:center;margin-top:2px;min-height:10px;}
+.knob .pointer::after{
+  content:'';
+  position:absolute;left:50%;top:4px;width:3px;height:11px;border-radius:2px;
+  background:var(--accent-deep);
+  transform:translateX(-50%);
+}
+.knob .pointer::before{
+  content:'';
+  position:absolute;left:50%;top:2px;width:5px;height:5px;border-radius:50%;
+  background:var(--iri-violet);
+  box-shadow:0 0 5px rgba(180,140,242,.7);
+  transform:translateX(-50%);
+}
+.knob-select{position:absolute;top:0;left:0;width:58px;height:58px;opacity:0;cursor:pointer;}
+.knob-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--accent-deep);letter-spacing:.3px;text-align:center;margin-top:4px;min-height:10px;}
 
 .vu-fader-row{display:flex;gap:8px;align-items:flex-end;}
 .vu{
@@ -341,9 +385,39 @@ input[type=file]{display:none;}
   *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
 }
 
-@media (max-width:520px){
-  .strip{width:100px;}
-  .vu{width:10px;}
+/* ---------- responsive ---------- */
+@media (max-width:760px){
+  .rack{
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    justify-content:flex-start;
+    scroll-snap-type:x mandatory;
+    -webkit-overflow-scrolling:touch;
+    padding:16px 14px;
+  }
+  .strip{flex:0 0 134px;scroll-snap-align:start;}
+  .bridge-row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
+  .bridge-slot{flex:0 0 150px;}
+}
+
+@media (max-width:600px){
+  .wrap{padding:0 4px;}
+  body{padding:24px 10px 56px;}
+  .panel{padding:20px 16px;border-radius:22px;}
+  .title-block h1{letter-spacing:3px;}
+  .deck-row{gap:14px;}
+  .deck-col{flex:1 1 100%;}
+  .deck-col[style*="flex:0 0 auto"]{flex:1 1 100% !important;}
+  .lever-area{justify-content:center;}
+  .transport{justify-content:center;}
+  .master-row{justify-content:center;}
+}
+
+@media (max-width:420px){
+  .btn{font-size:12px;padding:10px 14px;}
+  .panel-label{font-size:10px;letter-spacing:2px;}
+  .knob-row{gap:12px;}
+  .ms-btn{width:38px;height:30px;}
 }
 </style>
 </head>
@@ -672,6 +746,7 @@ input[type=file]{display:none;}
   const bridgeRow = document.getElementById('bridgeRow');
 
   function knobAngle(index, count){ return -135 + (index/(count-1))*270; }
+  function knobFill(index, count){ return (index/(count-1))*270; }
 
   function renderRack(){
     rack.innerHTML = '';
@@ -747,18 +822,27 @@ input[type=file]{display:none;}
     wrap.className = 'knob-wrap';
     const idx = selectedIndex>=0?selectedIndex:0;
     wrap.innerHTML = `
-      <div class="knob" id="${idBase}-knob"><div class="pointer" style="--rot:${knobAngle(idx, options.length)}deg"></div></div>
+      <div class="knob-dial" style="--fill:${knobFill(idx, options.length)}deg">
+        <div class="knob-track"></div>
+        <div class="knob-fill"></div>
+        <div class="knob-ticks">
+          <span style="--t:-135deg"></span><span style="--t:0deg"></span><span style="--t:135deg"></span>
+        </div>
+        <div class="knob" id="${idBase}-knob"><div class="pointer" style="--rot:${knobAngle(idx, options.length)}deg"></div></div>
+      </div>
       <select class="knob-select" id="${idBase}-select">
         ${options.map((o,i)=>`<option value="${i}" ${i===idx?'selected':''}>${o.label}</option>`).join('')}
       </select>
       <div class="knob-label" id="${idBase}-label">${options[idx].label}</div>
     `;
     const select = wrap.querySelector('select');
+    const dial = wrap.querySelector('.knob-dial');
     const pointer = wrap.querySelector('.pointer');
     const labelEl = wrap.querySelector(`#${idBase}-label`);
     select.addEventListener('change', ()=>{
       const i = parseInt(select.value,10);
       pointer.style.setProperty('--rot', knobAngle(i, options.length)+'deg');
+      dial.style.setProperty('--fill', knobFill(i, options.length)+'deg');
       labelEl.textContent = options[i].label;
       onChange(i);
     });
