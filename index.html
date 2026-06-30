@@ -3,24 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Harmony Deck — V1</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<title>Harmony Deck — One voice. Every part.</title>
+<meta name="description" content="Harmony Deck splits your vocal, generates harmony parts in your key, and lets you mix them on a tactile rack — entirely in your browser.">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,500;0,600;1,500;1,600&family=Manrope:wght@500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root{
-  --bg:#e7ecf6;
-  --surface:#eef2f9;
-  --surface-sunken:#dee5f1;
-  --shadow-dark:#b7c2da;
+  --bg:#e9edf7;
+  --surface:#f3f5fb;
+  --surface-sunken:#dde4f0;
+  --shadow-dark:#bcc6de;
   --shadow-light:#ffffff;
-  --ink:#424a60;
-  --ink-soft:#8a93ad;
-  --accent:#6c79ef;
-  --accent-deep:#5360d8;
-  --good:#57c98a;
-  --warn:#e8a861;
-  --bad:#ef7f7f;
+  --ink:#363c52;
+  --ink-soft:#7d87a3;
 
   --iri-violet:#b48cf2;
   --iri-blue:#7fb2f0;
@@ -29,1111 +24,479 @@
   --iridescent: linear-gradient(115deg, var(--iri-violet), var(--iri-blue), var(--iri-teal), var(--iri-pink), var(--iri-violet));
 }
 
-@keyframes shimmer{
-  0%,100%{background-position:0% 50%;}
-  50%{background-position:100% 50%;}
-}
-
 *{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
 
 body{
   margin:0;
-  min-height:100vh;
   background:var(--bg);
   font-family:'Manrope', sans-serif;
   color:var(--ink);
-  padding:32px 16px 70px;
+  line-height:1.5;
 }
 
-.wrap{max-width:1180px;margin:0 auto;}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px;}
 
-.title-block{text-align:center;margin-bottom:26px;}
-.title-block h1{
-  font-family:'Manrope',sans-serif;
-  font-weight:800;
-  font-size:clamp(26px,5vw,42px);
-  letter-spacing:0.5px;
-  margin:0;
-  color:var(--ink);
+a{color:inherit;}
+
+/* ---------- shared neumorphic primitives ---------- */
+.raised{
+  background:var(--surface);
+  box-shadow:9px 9px 18px var(--shadow-dark), -9px -9px 18px var(--shadow-light);
 }
-.title-block .sub{
+.sunken{
+  background:var(--surface-sunken);
+  box-shadow:inset 6px 6px 12px var(--shadow-dark), inset -6px -6px 12px var(--shadow-light);
+}
+
+.eyebrow{
   font-family:'JetBrains Mono',monospace;
   font-size:11px;
-  letter-spacing:2px;
-  color:var(--ink-soft);
-  text-transform:uppercase;
-  margin-top:8px;
-}
-
-.panel{
-  background:var(--surface);
-  border-radius:26px;
-  box-shadow:10px 10px 22px var(--shadow-dark), -10px -10px 22px var(--shadow-light);
-  padding:24px;
-  margin-bottom:22px;
-  position:relative;
-}
-.panel-label{
-  font-family:'Manrope',sans-serif;
-  font-weight:700;
-  font-size:11px;
   letter-spacing:2.5px;
-  color:var(--ink-soft);
   text-transform:uppercase;
-  margin:-4px 0 18px 2px;
-  padding-bottom:0;
-  display:flex;
-  align-items:center;
-  gap:9px;
+  color:var(--ink-soft);
+  display:flex;align-items:center;gap:9px;
+  margin:0 0 14px;
 }
-.panel-label::before{
-  content:'';
-  width:6px;height:6px;border-radius:50%;
+.eyebrow::before{
+  content:'';width:7px;height:7px;border-radius:50%;
   background:var(--iridescent);
   background-size:300% 300%;
-  animation:shimmer 9s ease-in-out infinite;
   flex-shrink:0;
+  animation:shimmer 9s ease-in-out infinite;
 }
 
-/* ---- Tape deck ---- */
-.deck-row{display:flex;flex-wrap:wrap;gap:18px;align-items:stretch;}
-.deck-col{flex:1 1 220px;}
-
-.dropzone{
-  border:none;
-  border-radius:18px;
-  background:var(--surface);
-  box-shadow:inset 6px 6px 12px var(--shadow-dark), inset -6px -6px 12px var(--shadow-light);
-  padding:18px;
-  text-align:center;
-  cursor:pointer;
-  min-height:96px;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-  transition:box-shadow .15s ease;
-}
-.dropzone:hover, .dropzone.drag{
-  box-shadow:inset 4px 4px 9px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light), 0 0 0 2px rgba(108,121,239,0.28) inset;
-}
-.dropzone .hint{font-size:13px;letter-spacing:.2px;color:var(--ink-soft);}
-.dropzone .fname{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent-deep);}
+h1,h2,h3{margin:0;font-weight:600;}
 
 .btn{
   font-family:'Manrope',sans-serif;
   font-weight:700;
-  letter-spacing:.3px;
-  font-size:13px;
-  padding:11px 18px;
-  border-radius:14px;
+  font-size:14px;
+  letter-spacing:.2px;
+  padding:14px 26px;
+  border-radius:16px;
   border:none;
+  cursor:pointer;
+  display:inline-flex;align-items:center;gap:8px;
+  text-decoration:none;
+  transition:box-shadow .15s ease, transform .15s ease;
+}
+.btn-primary{
+  background:var(--iridescent);
+  background-size:300% 300%;
+  color:#fff;
+  box-shadow:8px 8px 18px rgba(120,110,220,0.35), -6px -6px 14px var(--shadow-light);
+  animation:shimmer 10s ease-in-out infinite;
+}
+.btn-primary:hover{transform:translateY(-1px);}
+.btn-primary:active{transform:translateY(0);box-shadow:inset 4px 4px 9px rgba(70,60,160,0.35), inset -3px -3px 7px rgba(255,255,255,0.2);}
+.btn-ghost{
   background:var(--surface);
   color:var(--ink);
-  cursor:pointer;
-  box-shadow:6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
-  transition:box-shadow .12s ease, color .12s ease;
+  box-shadow:6px 6px 14px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
 }
-.btn:hover{color:var(--accent-deep);}
-.btn:active{
-  box-shadow:inset 4px 4px 9px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light);
-}
-.btn:disabled{
-  opacity:.45;cursor:not-allowed;
-  box-shadow:4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
-}
-.btn:focus-visible, .ms-btn:focus-visible, input:focus-visible, select:focus-visible, .lever:focus-visible{
-  outline:2px solid var(--accent-deep);
-  outline-offset:2px;
-}
-.btn.record{color:var(--bad);}
-.btn.record.active{background:var(--bad);color:#fff;animation:pulse 1.4s infinite;}
-.btn.amber{
-  background:var(--iridescent);
-  background-size:300% 300%;
-  animation:shimmer 10s ease-in-out infinite;
-  color:#fff;
-  box-shadow:6px 6px 16px rgba(140,120,220,0.4), -4px -4px 10px var(--shadow-light);
-}
-.btn.amber:active{
-  box-shadow:inset 4px 4px 9px rgba(90,70,170,0.45), inset -3px -3px 7px rgba(255,255,255,0.2);
-}
-.btn.small{padding:8px 13px;font-size:11px;border-radius:11px;}
-@keyframes pulse{
-  0%,100%{box-shadow:0 0 0 0 rgba(239,127,127,.55), 6px 6px 12px var(--shadow-dark);}
-  50%{box-shadow:0 0 0 9px rgba(239,127,127,0), 6px 6px 12px var(--shadow-dark);}
-}
+.btn-ghost:active{box-shadow:inset 4px 4px 9px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light);}
+a.btn:focus-visible, button:focus-visible{outline:2px solid var(--iri-violet);outline-offset:3px;}
 
-.transport{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;}
-
-.lever-area{display:flex;align-items:center;gap:14px;}
-.lever{
-  width:64px;height:34px;
-  background:var(--surface);
-  border-radius:20px;
-  position:relative;cursor:pointer;
-  box-shadow:inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
-  transition:background .25s ease, box-shadow .25s ease;
+@keyframes shimmer{
+  0%,100%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
 }
-.lever.on{
-  background:var(--iridescent);
-  background-size:300% 300%;
-  animation:shimmer 8s ease-in-out infinite;
-  box-shadow:inset 3px 3px 7px rgba(90,70,170,0.4), inset -2px -2px 6px rgba(255,255,255,0.15);
-}
-.lever .handle{
-  position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;
-  background:var(--surface);
-  box-shadow:3px 3px 7px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
-  transition:left .25s ease, background .25s ease;
-}
-.lever.on .handle{left:34px;background:#fff;}
-
-.bulb-stack{display:flex;flex-direction:column;align-items:center;gap:6px;}
-.bulb{
-  width:16px;height:16px;border-radius:50%;
-  background:var(--surface);
-  box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-  transition:background .2s ease, box-shadow .2s ease;
-}
-.bulb.lit-amber{
-  background:var(--warn);
-  box-shadow:0 0 0 4px rgba(232,168,97,0.25), 2px 2px 5px var(--shadow-dark);
-}
-.bulb.lit-green{
-  background:var(--good);
-  box-shadow:0 0 0 4px rgba(87,201,138,0.25), 2px 2px 5px var(--shadow-dark);
-}
-.bulb-caption{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--ink-soft);text-align:center;}
-
-.readout{
-  font-family:'JetBrains Mono',monospace;
-  background:var(--surface);border-radius:14px;
-  padding:10px 14px;color:var(--accent-deep);
-  font-size:14px;letter-spacing:1px;
-  box-shadow:inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
-  min-width:160px;text-align:center;
-}
-.readout .label{display:block;font-size:9px;color:var(--ink-soft);letter-spacing:2px;margin-bottom:4px;}
-
-/* ---- Mixer rack ---- */
-.rack{
-  background:var(--surface-sunken);
-  border-radius:22px;
-  box-shadow:inset 6px 6px 14px var(--shadow-dark), inset -6px -6px 14px var(--shadow-light);
-  padding:20px;
-  display:flex;
-  gap:14px;
-  flex-wrap:wrap;
-  justify-content:center;
-}
-.strip{
-  background:var(--surface);
-  border-radius:18px;
-  width:128px;
-  padding:14px 10px 16px;
-  display:flex;flex-direction:column;align-items:center;gap:10px;
-  box-shadow:7px 7px 14px var(--shadow-dark), -7px -7px 14px var(--shadow-light);
-}
-.strip-name{
-  font-weight:800;font-size:11px;letter-spacing:1.5px;color:var(--ink);
-  background:var(--surface);
-  border-radius:10px;
-  box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-  padding:5px 0;width:100%;text-align:center;
-}
-.strip-status{font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:1px;color:var(--ink-soft);min-height:11px;text-align:center;}
-
-.knob-row{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
-.knob-wrap{position:relative;width:58px;height:58px;display:flex;flex-direction:column;align-items:center;}
-.knob-dial{position:relative;width:58px;height:58px;}
-.knob-track,.knob-fill{
-  position:absolute;inset:0;border-radius:50%;
-  -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-  mask:radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
-}
-.knob-track{
-  background:conic-gradient(from -135deg, var(--shadow-dark) 0deg 270deg, transparent 270deg 360deg);
-  opacity:.55;
-}
-.knob-fill{
-  background:conic-gradient(from -135deg, var(--iri-violet), var(--iri-blue), var(--iri-teal) var(--fill,0deg), transparent var(--fill,0deg) 360deg);
-}
-.knob-ticks span{
-  position:absolute;left:50%;top:50%;width:2px;height:5px;border-radius:1px;
-  background:var(--shadow-dark);
-  transform:translate(-50%,-50%) rotate(var(--t,0deg)) translateY(-25px);
-}
-.knob{
-  position:absolute;inset:9px;border-radius:50%;
-  background:var(--surface);
-  box-shadow:5px 5px 10px var(--shadow-dark), -5px -5px 10px var(--shadow-light);
-}
-.knob .pointer{
-  position:absolute;inset:0;
-  transform:rotate(var(--rot,-135deg));
-}
-.knob .pointer::after{
-  content:'';
-  position:absolute;left:50%;top:4px;width:3px;height:11px;border-radius:2px;
-  background:var(--accent-deep);
-  transform:translateX(-50%);
-}
-.knob .pointer::before{
-  content:'';
-  position:absolute;left:50%;top:2px;width:5px;height:5px;border-radius:50%;
-  background:var(--iri-violet);
-  box-shadow:0 0 5px rgba(180,140,242,.7);
-  transform:translateX(-50%);
-}
-.knob-select{position:absolute;top:0;left:0;width:58px;height:58px;opacity:0;cursor:pointer;}
-.knob-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--accent-deep);letter-spacing:.3px;text-align:center;margin-top:4px;min-height:10px;}
-
-.vu-fader-row{display:flex;gap:8px;align-items:flex-end;}
-.vu{
-  width:12px;height:150px;border-radius:6px;
-  background:var(--surface-sunken);
-  position:relative;overflow:hidden;
-  box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-}
-.vu .fill{
-  position:absolute;bottom:0;left:0;width:100%;height:0%;
-  background:linear-gradient(0deg, var(--good) 0%, var(--good) 55%, var(--warn) 78%, var(--bad) 92%);
-  transition:height .05s linear;
-  border-radius:6px 6px 0 0;
-}
-.fader-track{width:36px;height:150px;position:relative;}
-.fader-track input[type=range]{
-  position:absolute;left:50%;top:50%;width:150px;height:26px;
-  transform:translate(-50%,-50%) rotate(-90deg);
-  -webkit-appearance:none;appearance:none;background:transparent;margin:0;
-}
-.fader-track input[type=range]::-webkit-slider-runnable-track{
-  height:8px;border-radius:6px;
-  background:var(--surface-sunken);
-  box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);
-}
-.fader-track input[type=range]::-webkit-slider-thumb{
-  -webkit-appearance:none;width:26px;height:26px;border-radius:50%;
-  background:var(--surface);
-  border:3px solid var(--accent);
-  margin-top:-9px;
-  box-shadow:4px 4px 8px var(--shadow-dark), -3px -3px 7px var(--shadow-light);
-}
-.fader-track input[type=range]::-moz-range-track{
-  height:8px;border-radius:6px;background:var(--surface-sunken);
-}
-.fader-track input[type=range]::-moz-range-thumb{
-  width:26px;height:26px;border-radius:50%;background:var(--surface);border:3px solid var(--accent);
-}
-
-.mute-solo{display:flex;gap:6px;}
-.ms-btn{
-  width:34px;height:26px;border-radius:9px;border:none;
-  font-family:'Manrope',sans-serif;font-size:10px;font-weight:800;
-  background:var(--surface);color:var(--ink-soft);cursor:pointer;
-  box-shadow:4px 4px 8px var(--shadow-dark), -4px -4px 8px var(--shadow-light);
-  transition:box-shadow .12s ease, color .12s ease, background .12s ease;
-}
-.ms-btn:active{box-shadow:inset 3px 3px 6px var(--shadow-dark), inset -3px -3px 6px var(--shadow-light);}
-.ms-btn.mute.active{
-  background:var(--bad);color:#fff;
-  box-shadow:inset 3px 3px 6px rgba(150,40,40,.4), inset -2px -2px 5px rgba(255,255,255,.2);
-}
-.ms-btn.solo.active{
-  background:var(--warn);color:#553300;
-  box-shadow:inset 3px 3px 6px rgba(150,100,20,.35), inset -2px -2px 5px rgba(255,255,255,.25);
-}
-
-.gen-btn{width:100%;}
-
-/* ---- Collaboration bridge ---- */
-.bridge-row{display:flex;flex-wrap:wrap;gap:14px;}
-.bridge-slot{
-  flex:1 1 150px;
-  background:var(--surface);border-radius:16px;
-  padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;
-  box-shadow:6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
-}
-.bridge-slot .name{font-size:11px;letter-spacing:1px;font-weight:700;color:var(--ink);}
-
-/* ---- Master ---- */
-.master-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
-
-.info-note{
-  font-family:'Manrope',sans-serif;
-  font-size:12px;line-height:1.65;color:var(--ink-soft);
-  background:var(--surface-sunken);
-  border-radius:14px;padding:14px 16px;
-  margin-top:8px;
-  box-shadow:inset 4px 4px 9px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light);
-}
-.info-note b{color:var(--accent-deep);}
-
-input[type=file]{display:none;}
-
-.bridge-slot-label{
-  display:block;font-family:'Manrope',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.5px;
-  color:var(--ink-soft);text-transform:uppercase;margin:8px 0 4px;
-}
-.cloud-input{
-  font-family:'JetBrains Mono',monospace;font-size:12px;
-  background:var(--surface);border:none;border-radius:10px;color:var(--ink);
-  padding:10px 12px;
-  box-shadow:inset 4px 4px 9px var(--shadow-dark), inset -4px -4px 9px var(--shadow-light);
-}
-.cloud-input::placeholder{color:var(--ink-soft);opacity:.75;}
-
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
 }
 
-/* ---------- responsive ---------- */
-@media (max-width:760px){
-  .rack{
-    flex-wrap:nowrap;
-    overflow-x:auto;
-    justify-content:flex-start;
-    scroll-snap-type:x mandatory;
-    -webkit-overflow-scrolling:touch;
-    padding:16px 14px;
-  }
-  .strip{flex:0 0 134px;scroll-snap-align:start;}
-  .bridge-row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;}
-  .bridge-slot{flex:0 0 150px;}
+/* ---------- nav ---------- */
+nav{
+  position:sticky;top:0;z-index:20;
+  background:rgba(243,245,251,0.85);
+  backdrop-filter:blur(10px);
+  box-shadow:0 6px 18px rgba(180,190,220,0.25);
+}
+.nav-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 24px;max-width:1180px;margin:0 auto;
+}
+.wordmark{
+  font-family:'Fraunces',serif;font-style:italic;font-weight:600;
+  font-size:20px;color:var(--ink);display:flex;align-items:center;gap:8px;
+}
+.wordmark .dot{
+  width:8px;height:8px;border-radius:50%;background:var(--iridescent);
+  background-size:300% 300%;animation:shimmer 8s ease-in-out infinite;
+}
+.nav-links{display:flex;align-items:center;gap:28px;}
+.nav-links a{
+  font-size:13px;font-weight:700;color:var(--ink-soft);text-decoration:none;
+  transition:color .15s ease;
+}
+.nav-links a:hover{color:var(--ink);}
+.nav-cta{display:none;}
+@media (min-width:760px){.nav-cta{display:inline-flex;}}
+.nav-links .mobile-only-cta{display:inline-flex;}
+@media (min-width:760px){.nav-links .mobile-only-cta{display:none;}}
+
+/* ---------- hero ---------- */
+.hero{
+  padding:72px 0 90px;
+  display:flex;align-items:center;gap:56px;flex-wrap:wrap;
+}
+.hero-copy{flex:1 1 420px;min-width:300px;}
+.hero h1{
+  font-family:'Fraunces',serif;font-style:italic;font-weight:600;
+  font-size:clamp(38px,6vw,64px);
+  line-height:1.05;letter-spacing:-0.5px;color:var(--ink);
+  margin-bottom:20px;
+}
+.hero p.lede{
+  font-size:17px;color:var(--ink-soft);max-width:480px;margin-bottom:32px;
+}
+.hero-ctas{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:28px;}
+.hero-meta{
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;
+  color:var(--ink-soft);text-transform:uppercase;
 }
 
-@media (max-width:600px){
-  .wrap{padding:0 4px;}
-  body{padding:24px 10px 56px;}
-  .panel{padding:20px 16px;border-radius:22px;}
-  .title-block h1{letter-spacing:3px;}
-  .deck-row{gap:14px;}
-  .deck-col{flex:1 1 100%;}
-  .deck-col[style*="flex:0 0 auto"]{flex:1 1 100% !important;}
-  .lever-area{justify-content:center;}
-  .transport{justify-content:center;}
-  .master-row{justify-content:center;}
+/* ---- Voice Prism (signature) ---- */
+.prism-wrap{
+  flex:1 1 360px;min-width:300px;
+  display:flex;justify-content:center;
+}
+.prism{
+  position:relative;width:360px;height:340px;
+}
+.prism svg{position:absolute;top:0;left:0;width:100%;height:100%;}
+.prism .ray{
+  stroke-dasharray:6 7;
+  animation:travel 5s linear infinite;
+}
+@keyframes travel{ to{ stroke-dashoffset:-130; } }
+
+.orb{
+  position:absolute;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;
+}
+.orb-main{
+  width:128px;height:128px;left:0;top:106px;
+  background:var(--surface);
+  box-shadow:10px 10px 20px var(--shadow-dark), -10px -10px 20px var(--shadow-light);
+  animation:breathe 5s ease-in-out infinite;
+}
+.orb-main .lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1.2px;color:var(--ink-soft);text-transform:uppercase;}
+.orb-main .lbl strong{display:block;font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;color:var(--ink);margin-top:3px;letter-spacing:0;text-transform:none;}
+
+.orb-part{
+  width:84px;height:84px;
+  box-shadow:7px 7px 16px var(--shadow-dark), -6px -6px 14px var(--shadow-light);
+  animation:float 6s ease-in-out infinite;
+}
+.orb-part .lbl{font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.6px;color:#3b3550;}
+.orb-part .lbl strong{display:block;font-family:'Manrope',sans-serif;font-size:11px;font-weight:800;color:#2c2840;letter-spacing:0;}
+
+.orb-soprano{left:248px;top:0;background:radial-gradient(circle at 32% 28%, #fbe4f6 0%, var(--iri-pink) 75%);animation-delay:0s;}
+.orb-alto{left:276px;top:128px;background:radial-gradient(circle at 32% 28%, #ece1fb 0%, var(--iri-violet) 75%);animation-delay:.6s;}
+.orb-tenor{left:248px;top:256px;background:radial-gradient(circle at 32% 28%, #e1f7f0 0%, var(--iri-teal) 75%);animation-delay:1.2s;}
+
+@keyframes breathe{0%,100%{transform:scale(1);}50%{transform:scale(1.035);}}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+
+@media (max-width:520px){
+  .prism{width:300px;height:300px;transform:scale(0.86);}
 }
 
-@media (max-width:420px){
-  .btn{font-size:12px;padding:10px 14px;}
-  .panel-label{font-size:10px;letter-spacing:2px;}
-  .knob-row{gap:12px;}
-  .ms-btn{width:38px;height:30px;}
+/* ---------- sections (shared) ---------- */
+section{padding:70px 0;}
+.section-head{max-width:640px;margin-bottom:44px;}
+.section-head h2{
+  font-family:'Fraunces',serif;font-weight:600;
+  font-size:clamp(26px,3.4vw,36px);color:var(--ink);
 }
+.section-head p{color:var(--ink-soft);margin-top:12px;font-size:15.5px;}
+
+/* ---------- steps ---------- */
+.steps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:22px;}
+.step-card{
+  border-radius:22px;padding:28px 26px;
+  background:var(--surface);
+  box-shadow:9px 9px 18px var(--shadow-dark), -9px -9px 18px var(--shadow-light);
+}
+.step-num{
+  font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;
+  color:transparent;
+  background:var(--iridescent);background-size:300% 300%;
+  -webkit-background-clip:text;background-clip:text;
+  animation:shimmer 9s ease-in-out infinite;
+  margin-bottom:14px;display:inline-block;
+}
+.step-card h3{font-size:18px;margin-bottom:8px;}
+.step-card p{color:var(--ink-soft);font-size:14px;margin:0;}
+
+/* ---------- features ---------- */
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;}
+.feature-tile{
+  border-radius:20px;padding:26px;
+  background:var(--surface);
+  box-shadow:8px 8px 16px var(--shadow-dark), -8px -8px 16px var(--shadow-light);
+}
+.feature-icon{
+  width:40px;height:40px;border-radius:50%;margin-bottom:16px;
+  background:var(--surface);
+  box-shadow:4px 4px 9px var(--shadow-dark), -4px -4px 9px var(--shadow-light);
+  position:relative;
+}
+.feature-icon::after{
+  content:'';position:absolute;inset:6px;border-radius:50%;
+  background:var(--iridescent);background-size:300% 300%;
+  animation:shimmer 11s ease-in-out infinite;
+  opacity:.85;
+}
+.feature-tile h3{font-size:15.5px;margin-bottom:8px;}
+.feature-tile p{color:var(--ink-soft);font-size:13.5px;margin:0;}
+
+/* ---------- mixer preview ---------- */
+.mixer-section{
+  border-radius:30px;
+  padding:48px 40px;
+  background:var(--surface);
+  box-shadow:12px 12px 26px var(--shadow-dark), -12px -12px 26px var(--shadow-light);
+  display:flex;gap:48px;align-items:center;flex-wrap:wrap;
+}
+.mixer-copy{flex:1 1 320px;min-width:280px;}
+.mixer-copy h2{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(24px,3vw,32px);margin-bottom:14px;}
+.mixer-copy p{color:var(--ink-soft);font-size:15px;margin-bottom:22px;}
+
+.rack-demo{
+  flex:1 1 320px;min-width:280px;
+  display:flex;gap:14px;justify-content:center;flex-wrap:wrap;
+  padding:22px;border-radius:22px;
+  background:var(--surface-sunken);
+  box-shadow:inset 6px 6px 14px var(--shadow-dark), inset -6px -6px 14px var(--shadow-light);
+}
+.demo-strip{
+  background:var(--surface);border-radius:16px;width:96px;padding:14px 8px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  box-shadow:6px 6px 13px var(--shadow-dark), -6px -6px 13px var(--shadow-light);
+}
+.demo-name{
+  font-size:9.5px;font-weight:800;letter-spacing:1px;color:var(--ink);
+  background:var(--surface);border-radius:8px;padding:4px 0;width:100%;text-align:center;
+  box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+}
+.demo-knob{
+  width:34px;height:34px;border-radius:50%;background:var(--surface);
+  box-shadow:4px 4px 8px var(--shadow-dark), -3px -3px 7px var(--shadow-light);
+  position:relative;
+}
+.demo-knob::after{
+  content:'';position:absolute;left:50%;top:4px;width:2.5px;height:10px;
+  background:var(--iri-violet);border-radius:2px;transform:translateX(-50%) rotate(var(--r,15deg));
+}
+.demo-fader{width:8px;height:64px;border-radius:5px;background:var(--surface-sunken);
+  box-shadow:inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+  position:relative;
+}
+.demo-fader::after{
+  content:'';position:absolute;left:-9px;width:26px;height:14px;border-radius:7px;
+  background:var(--surface);border:2px solid var(--iri-blue);
+  box-shadow:3px 3px 6px var(--shadow-dark);
+  top:var(--ft,18px);
+}
+
+/* ---------- cloud callout ---------- */
+.cloud-banner{
+  border-radius:26px;padding:36px 40px;
+  background:var(--surface-sunken);
+  box-shadow:inset 6px 6px 14px var(--shadow-dark), inset -6px -6px 14px var(--shadow-light);
+  display:flex;gap:28px;align-items:center;flex-wrap:wrap;justify-content:space-between;
+}
+.cloud-text{flex:1 1 360px;min-width:260px;}
+.cloud-text .eyebrow{margin-bottom:10px;}
+.cloud-text h3{font-size:18px;margin-bottom:8px;}
+.cloud-text p{color:var(--ink-soft);font-size:14px;margin:0;max-width:520px;}
+
+/* ---------- footer ---------- */
+footer{padding:50px 0 60px;}
+.footer-row{
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.5px;color:var(--ink-soft);
+}
+.footer-links{display:flex;gap:20px;}
+.footer-links a{text-decoration:none;color:var(--ink-soft);}
+.footer-links a:hover{color:var(--ink);}
 </style>
 </head>
 <body>
 
+<nav>
+  <div class="nav-row">
+    <div class="wordmark"><span class="dot"></span>Harmony Deck</div>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#cloud">Cloud AI</a>
+      <a href="https://github.com/Alex-Almanzar/HarmonizerV1Beta">GitHub</a>
+      <a class="btn btn-primary nav-cta" href="app/index.html">Open the app</a>
+    </div>
+  </div>
+</nav>
+
 <div class="wrap">
-  <div class="title-block">
-    <h1>HARMONY DECK</h1>
-    <div class="sub">V1 Prototype Workstation — Split / Harmonize / Mix</div>
-  </div>
 
-  <!-- TAPE DECK -->
-  <div class="panel">
-    <div class="panel-label">Tape Machine — Input &amp; Splitting</div>
-    <div class="deck-row">
-      <div class="deck-col">
-        <div class="dropzone" id="dropZone">
-          <div class="hint">Drop an audio file, or click to browse</div>
-          <div class="fname" id="fileName">No file loaded</div>
-        </div>
-        <input type="file" id="fileInput" accept="audio/*">
-        <div class="transport">
-          <button class="btn record" id="recordBtn">● Record</button>
-          <button class="btn" id="previewBtn">▶ Preview Original</button>
-          <button class="btn" id="stopPreviewBtn">■ Stop</button>
-        </div>
+  <header class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">V1 prototype workstation</p>
+      <h1>One voice.<br>Every part.</h1>
+      <p class="lede">Harmony Deck splits your vocal, works out the key, and generates Soprano, Alto, and Tenor parts from your own take — same phrasing, same breath. Mix everything on a tactile rack, right in your browser.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="app/index.html">Open the app</a>
+        <a class="btn btn-ghost" href="https://github.com/Alex-Almanzar/HarmonizerV1Beta">View on GitHub</a>
       </div>
+      <p class="hero-meta">No install · no upload · runs entirely client-side</p>
+    </div>
 
-      <div class="deck-col" style="flex:0 0 auto;">
-        <div class="lever-area">
-          <div>
-            <div class="lever" id="splitLever"><div class="handle"></div></div>
-          </div>
-          <div class="bulb-stack">
-            <div class="bulb" id="splitBulb"></div>
-            <div class="bulb-caption" id="splitCaption">ISOLATE<br>VOCAL</div>
-          </div>
-        </div>
-      </div>
+    <div class="prism-wrap">
+      <div class="prism">
+        <svg viewBox="0 0 360 340" aria-hidden="true">
+          <defs>
+            <linearGradient id="rayGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#bcc6de" stop-opacity="0"/>
+              <stop offset="35%" stop-color="#b48cf2" stop-opacity=".8"/>
+              <stop offset="100%" stop-color="#6be0c8" stop-opacity=".8"/>
+            </linearGradient>
+          </defs>
+          <path class="ray" d="M126 170 L290 42" stroke="url(#rayGrad)" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path class="ray" d="M128 170 L318 170" stroke="url(#rayGrad)" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path class="ray" d="M126 170 L290 298" stroke="url(#rayGrad)" stroke-width="2" fill="none" stroke-linecap="round"/>
+        </svg>
 
-      <div class="deck-col" style="flex:0 0 auto;">
-        <div class="readout">
-          <span class="label">Detected Key</span>
-          <span id="keyReadout">— — —</span>
+        <div class="orb orb-main">
+          <div class="lbl">source<strong>Your voice</strong></div>
         </div>
-        <div style="margin-top:8px;">
-          <button class="btn small" id="analyzeKeyBtn">Re-Analyze Key</button>
+        <div class="orb orb-part orb-soprano">
+          <div class="lbl">soprano<strong>+3rd</strong></div>
+        </div>
+        <div class="orb orb-part orb-alto">
+          <div class="lbl">alto<strong>+5th</strong></div>
+        </div>
+        <div class="orb orb-part orb-tenor">
+          <div class="lbl">tenor<strong>−3rd</strong></div>
         </div>
       </div>
     </div>
-    <div class="info-note">
-      <b>How splitting works here:</b> this prototype uses mid/side processing (vocal ≈ center channel, instrumental ≈ sides) — a real classic isolation trick that works best on stereo mixes with a centered lead vocal. It's a DSP approximation, not a trained source-separation model, so results vary by track.
-    </div>
-  </div>
+  </header>
 
-  <!-- MIXER RACK -->
-  <div class="panel">
-    <div class="panel-label">Harmony Mixer — Lead / Soprano / Alto / Tenor / Backing</div>
-    <div class="rack" id="rack"></div>
-    <div class="master-row" style="margin-top:16px;">
-      <button class="btn amber" id="playAllBtn">▶ Play Mix</button>
-      <button class="btn" id="stopAllBtn">■ Stop</button>
-      <button class="btn" id="exportMasterBtn">⇩ Export Master (WAV)</button>
-      <button class="btn" id="exportAllBtn">⇩ Export All Stems (ZIP)</button>
+  <section id="how">
+    <div class="section-head">
+      <h2>Three steps, in order</h2>
+      <p>Each stage needs the one before it — you can't harmonize a part that hasn't been isolated yet, or mix a part that hasn't been generated.</p>
     </div>
-    <div class="info-note">
-      <b>How harmony parts work:</b> each part is generated by granular-resynthesis pitch-shifting of your actual isolated vocal performance (same phrasing &amp; timing, shifted by the chosen interval) — not a generic synth voice. The tone knob applies a live EQ character on top. This is a DSP approximation of voice-conversion harmony tools, built to run entirely in your browser.
+    <div class="steps-grid">
+      <div class="step-card">
+        <span class="step-num">01</span>
+        <h3>Split</h3>
+        <p>Drop in a recording. Mid/side processing pulls your vocal from the mix using center-channel extraction.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">02</span>
+        <h3>Harmonize</h3>
+        <p>The key gets detected automatically. Each part is your isolated vocal, pitch-shifted to the right interval — not a synth voice.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">03</span>
+        <h3>Mix &amp; export</h3>
+        <p>Fade, mute, solo, and tone-shape every part on the rack. Bounce stems or a finished master as WAV.</p>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <!-- CLOUD AI VOICE ENGINE -->
-  <div class="panel">
-    <div class="panel-label">Cloud AI Voice Engine — Optional, requires your own server</div>
-    <div class="info-note" style="margin-top:0;margin-bottom:14px;">
-      This calls a <b>DiffSinger</b> score-to-singing model you deploy yourself (see DEPLOY.md). It's a different
-      input than the rest of this app: instead of transforming your recorded vocal, you give it lyrics + note names
-      + durations and it sings a brand new performance for that part. Leave the URL blank to keep using the
-      local pitch-shift engine above.
+  <section id="features">
+    <div class="section-head">
+      <h2>What's under the hood</h2>
+      <p>A real DSP pipeline, not a black box — every stage is a documented technique you can inspect in the source.</p>
     </div>
-    <div class="deck-row">
-      <div class="deck-col">
-        <label class="bridge-slot-label">API Base URL</label>
-        <input type="text" id="cloudApiUrl" placeholder="https://your-pod-id-8000.proxy.runpod.net" class="cloud-input" style="width:100%;">
-        <div class="transport">
-          <button class="btn small" id="cloudHealthBtn">Check Connection</button>
-          <span class="strip-status" id="cloudHealthStatus"></span>
+    <div class="feature-grid">
+      <div class="feature-tile">
+        <div class="feature-icon"></div>
+        <h3>Mid/side vocal isolation</h3>
+        <p>Center-channel extraction pulls a lead vocal from a stereo mix without needing separate stems.</p>
+      </div>
+      <div class="feature-tile">
+        <div class="feature-icon"></div>
+        <h3>Autocorrelation key detection</h3>
+        <p>Pitch-tracks your take and matches it against major/minor key profiles — or set the key by hand.</p>
+      </div>
+      <div class="feature-tile">
+        <div class="feature-icon"></div>
+        <h3>Granular harmony shifting</h3>
+        <p>Each part is generated by resynthesizing your own recorded performance at the chosen interval.</p>
+      </div>
+      <div class="feature-tile">
+        <div class="feature-icon"></div>
+        <h3>Live tone shaping</h3>
+        <p>Warm Alto, Bright Soprano, Airy Choir, and more — on-the-fly EQ character per channel.</p>
+      </div>
+      <div class="feature-tile">
+        <div class="feature-icon"></div>
+        <h3>Stem &amp; master export</h3>
+        <p>Bounce every part as an individual WAV stem, or a mixed-down master, straight from the browser.</p>
+      </div>
+      <div class="feature-tile">
+        <div class="feature-icon"></div>
+        <h3>Optional cloud AI engine</h3>
+        <p>Plug in a self-hosted DiffSinger model for fully AI-sung parts from lyrics and notes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="mixer-preview">
+    <div class="mixer-section">
+      <div class="mixer-copy">
+        <h2>It feels like a mixer, not a settings page</h2>
+        <p>Faders, knobs, mute and solo on every channel — the same tactile rack you'd find in a real vocal booth, rendered entirely in the browser.</p>
+        <a class="btn btn-ghost" href="app/index.html">Try the rack</a>
+      </div>
+      <div class="rack-demo">
+        <div class="demo-strip">
+          <div class="demo-name">SOPRANO</div>
+          <div class="demo-knob" style="--r:40deg"></div>
+          <div class="demo-fader" style="--ft:10px"></div>
+        </div>
+        <div class="demo-strip">
+          <div class="demo-name">ALTO</div>
+          <div class="demo-knob" style="--r:-20deg"></div>
+          <div class="demo-fader" style="--ft:24px"></div>
+        </div>
+        <div class="demo-strip">
+          <div class="demo-name">TENOR</div>
+          <div class="demo-knob" style="--r:90deg"></div>
+          <div class="demo-fader" style="--ft:34px"></div>
         </div>
       </div>
-      <div class="deck-col">
-        <label class="bridge-slot-label">Target Part</label>
-        <select id="cloudTargetPart" class="cloud-input" style="width:100%;">
-          <option value="soprano">Soprano</option>
-          <option value="alto">Alto</option>
-          <option value="tenor">Tenor</option>
-        </select>
-        <label class="bridge-slot-label" style="margin-top:8px;">Lyrics</label>
-        <input type="text" id="cloudLyrics" placeholder="Ha le lu jah" class="cloud-input" style="width:100%;">
-      </div>
-      <div class="deck-col">
-        <label class="bridge-slot-label">Notes (comma-separated)</label>
-        <input type="text" id="cloudNotes" placeholder="A4, A4, F4, G4" class="cloud-input" style="width:100%;">
-        <label class="bridge-slot-label" style="margin-top:8px;">Durations in seconds (comma-separated)</label>
-        <input type="text" id="cloudDurations" placeholder="1.0, 1.0, 0.5, 1.5" class="cloud-input" style="width:100%;">
-      </div>
     </div>
-    <div class="transport" style="margin-top:12px;">
-      <button class="btn amber" id="cloudRenderBtn">☁ Render via Cloud AI</button>
-      <span class="strip-status" id="cloudRenderStatus"></span>
-    </div>
-  </div>
+  </section>
 
-  <!-- COLLABORATION BRIDGE -->
-  <div class="panel">
-    <div class="panel-label">Collaboration Bridge — Send Parts</div>
-    <div class="bridge-row" id="bridgeRow"></div>
-  </div>
+  <section id="cloud">
+    <div class="cloud-banner">
+      <div class="cloud-text">
+        <p class="eyebrow">Bring your own GPU</p>
+        <h3>Want a fully AI-sung part instead?</h3>
+        <p>The Cloud AI Voice Engine panel calls a self-hosted DiffSinger model — you give it lyrics, notes, and durations, and it synthesizes a new performance from scratch. Needs your own GPU server; see the deploy guide for the full walkthrough.</p>
+      </div>
+      <a class="btn btn-ghost" href="https://github.com/Alex-Almanzar/HarmonizerV1Beta/blob/main/backend/DEPLOY.md">Read the deploy guide</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-row">
+      <span>Harmony Deck · V1 prototype · MIT licensed</span>
+      <div class="footer-links">
+        <a href="app/index.html">Open the app</a>
+        <a href="https://github.com/Alex-Almanzar/HarmonizerV1Beta">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
 </div>
-
-<script>
-(function(){
-  // ---------------- Audio engine ----------------
-  let ctx = null;
-  function getCtx(){
-    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
-    return ctx;
-  }
-  document.addEventListener('click', ()=>{ if(ctx && ctx.state==='suspended') ctx.resume(); }, {once:false});
-
-  const Engine = {
-    isolateVocal(buffer){
-      const len = buffer.length;
-      if (buffer.numberOfChannels < 2){
-        const mono = buffer.getChannelData(0);
-        return { vocal: mono.slice(), instrumental: new Float32Array(len) };
-      }
-      const L = buffer.getChannelData(0), R = buffer.getChannelData(1);
-      const vocal = new Float32Array(len), instrumental = new Float32Array(len);
-      for (let i=0;i<len;i++){
-        vocal[i] = (L[i]+R[i])/2;
-        instrumental[i] = (L[i]-R[i])/2;
-      }
-      return { vocal, instrumental };
-    },
-    pitchShift(input, semitones, sampleRate){
-      if (!semitones) return input.slice();
-      const ratio = Math.pow(2, semitones/12);
-      const grainSize = 4096, hop = grainSize/4;
-      const output = new Float32Array(input.length);
-      const win = new Float32Array(grainSize);
-      for (let i=0;i<grainSize;i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(grainSize-1));
-      for (let pos=0; pos+grainSize<input.length; pos+=hop){
-        for (let i=0;i<grainSize;i++){
-          const srcPos = pos + i*ratio;
-          const idx = Math.floor(srcPos), frac = srcPos-idx;
-          let s = 0;
-          if (idx+1 < input.length) s = input[idx]*(1-frac) + input[idx+1]*frac;
-          else if (idx < input.length) s = input[idx];
-          const o = pos+i;
-          if (o < output.length) output[o] += s*win[i];
-        }
-      }
-      let peak = 0;
-      for (let i=0;i<output.length;i++) peak = Math.max(peak, Math.abs(output[i]));
-      if (peak > 0){ const norm = 0.92/peak; for (let i=0;i<output.length;i++) output[i]*=norm; }
-      return output;
-    },
-    monoToBuffer(mono, sampleRate){
-      const c = getCtx();
-      const buf = c.createBuffer(1, mono.length, sampleRate);
-      buf.copyToChannel(mono, 0);
-      return buf;
-    },
-    detectKey(mono, sampleRate){
-      const frameSize = 1024, hopSec = 0.5;
-      const hop = Math.floor(sampleRate*hopSec);
-      const minFreq=80, maxFreq=900;
-      const minLag = Math.floor(sampleRate/maxFreq), maxLag = Math.floor(sampleRate/minFreq);
-      const chroma = new Array(12).fill(0);
-      for (let pos=0; pos+frameSize<mono.length; pos+=hop){
-        let rms=0;
-        for (let i=0;i<frameSize;i++) rms += mono[pos+i]*mono[pos+i];
-        rms = Math.sqrt(rms/frameSize);
-        if (rms < 0.012) continue;
-        let bestLag=-1, bestVal=-Infinity;
-        for (let lag=minLag; lag<=maxLag; lag++){
-          let sum=0;
-          for (let i=0;i<frameSize-lag;i++) sum += mono[pos+i]*mono[pos+i+lag];
-          if (sum > bestVal){ bestVal=sum; bestLag=lag; }
-        }
-        if (bestLag>0){
-          const freq = sampleRate/bestLag;
-          const midi = 69 + 12*Math.log2(freq/440);
-          const pc = ((Math.round(midi)%12)+12)%12;
-          chroma[pc] += rms;
-        }
-      }
-      const majorP=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
-      const minorP=[6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
-      const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-      function corr(hist, profile, root){
-        const rotated = profile.map((_,i)=>profile[(i-root+12)%12]);
-        const n=12, mh=hist.reduce((a,b)=>a+b,0)/n, mp=rotated.reduce((a,b)=>a+b,0)/n;
-        let num=0, dh=0, dp=0;
-        for (let i=0;i<n;i++){ num+=(hist[i]-mh)*(rotated[i]-mp); dh+=(hist[i]-mh)**2; dp+=(rotated[i]-mp)**2; }
-        return num/Math.sqrt((dh*dp)||1);
-      }
-      let best={score:-Infinity, name:'C', mode:'Major'};
-      for (let root=0; root<12; root++){
-        const sMaj = corr(chroma, majorP, root), sMin = corr(chroma, minorP, root);
-        if (sMaj>best.score) best={score:sMaj, name:names[root], mode:'Major'};
-        if (sMin>best.score) best={score:sMin, name:names[root], mode:'Minor'};
-      }
-      const totalEnergy = chroma.reduce((a,b)=>a+b,0);
-      if (totalEnergy < 0.05) return null;
-      return best.name + ' ' + best.mode;
-    }
-  };
-
-  function encodeWAV(audioBuffer){
-    const numChannels = audioBuffer.numberOfChannels;
-    const sampleRate = audioBuffer.sampleRate;
-    const length = audioBuffer.length;
-    const blockAlign = numChannels*2;
-    const dataSize = length*blockAlign;
-    const buf = new ArrayBuffer(44+dataSize);
-    const view = new DataView(buf);
-    function ws(o,s){ for(let i=0;i<s.length;i++) view.setUint8(o+i, s.charCodeAt(i)); }
-    ws(0,'RIFF'); view.setUint32(4,36+dataSize,true); ws(8,'WAVE');
-    ws(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
-    view.setUint16(22,numChannels,true); view.setUint32(24,sampleRate,true);
-    view.setUint32(28,sampleRate*blockAlign,true); view.setUint16(32,blockAlign,true); view.setUint16(34,16,true);
-    ws(36,'data'); view.setUint32(40,dataSize,true);
-    let offset=44;
-    const chans=[]; for(let c=0;c<numChannels;c++) chans.push(audioBuffer.getChannelData(c));
-    for (let i=0;i<length;i++){
-      for (let c=0;c<numChannels;c++){
-        let s = Math.max(-1, Math.min(1, chans[c][i]));
-        s = s<0 ? s*0x8000 : s*0x7FFF;
-        view.setInt16(offset, s, true); offset+=2;
-      }
-    }
-    return new Blob([view], {type:'audio/wav'});
-  }
-  function downloadBlob(blob, filename){
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.download=filename;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url), 3000);
-  }
-
-  // ---------------- App state ----------------
-  const INTERVALS = [
-    {label:'Unison', semis:0},
-    {label:'Min 3rd ↑', semis:3},
-    {label:'Maj 3rd ↑', semis:4},
-    {label:'P4th ↑', semis:5},
-    {label:'P5th ↑', semis:7},
-    {label:'Maj 6th ↑', semis:9},
-    {label:'Octave ↑', semis:12},
-    {label:'Min 3rd ↓', semis:-3},
-    {label:'Maj 3rd ↓', semis:-4},
-    {label:'P5th ↓', semis:-7},
-    {label:'Maj 6th ↓', semis:-9},
-    {label:'Octave ↓', semis:-12},
-  ];
-  const TONES = [
-    {label:'Soul Classic', type:'allpass', freq:1000, gain:0, q:1},
-    {label:'Warm Alto', type:'lowshelf', freq:400, gain:6, q:1},
-    {label:'Bright Soprano', type:'highshelf', freq:2800, gain:6, q:1},
-    {label:'Airy Choir', type:'highpass', freq:500, gain:0, q:0.8},
-    {label:'Bedroom Pop', type:'lowpass', freq:3800, gain:0, q:0.8},
-  ];
-
-  const CHANNEL_DEFS = [
-    {id:'lead', label:'LEAD', hasInterval:false, hasTone:false, defaultFader:1},
-    {id:'soprano', label:'SOPRANO', hasInterval:true, hasTone:true, defaultInterval:4, defaultFader:0.9},
-    {id:'alto', label:'ALTO', hasInterval:true, hasTone:true, defaultInterval:-3, defaultFader:0.9},
-    {id:'tenor', label:'TENOR', hasInterval:true, hasTone:true, defaultInterval:-12, defaultFader:0.9},
-    {id:'backing', label:'BACKING', hasInterval:false, hasTone:false, defaultFader:0.7},
-  ];
-
-  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null };
-  let channels = [];
-  let masterGain = null;
-  let playing = false;
-  let previewSource = null;
-  let recording = false, mediaRecorder = null, recordedChunks = [];
-
-  function buildChannelChain(ch){
-    const c = getCtx();
-    ch.gainNode = c.createGain(); ch.gainNode.gain.value = ch.faderValue;
-    ch.filterNode = c.createBiquadFilter();
-    ch.filterNode.type = 'allpass';
-    ch.analyser = c.createAnalyser(); ch.analyser.fftSize = 256;
-    ch.gainNode.connect(ch.filterNode);
-    ch.filterNode.connect(ch.analyser);
-    ch.analyser.connect(masterGain);
-  }
-
-  function initChannels(){
-    const c = getCtx();
-    masterGain = c.createGain(); masterGain.connect(c.destination);
-    channels = CHANNEL_DEFS.map(def => Object.assign({
-      buffer:null, monoData:null, muted:false, solo:false,
-      faderValue: def.defaultFader,
-      intervalSemis: def.defaultInterval || 0,
-      toneIndex: 0,
-      sourceNode:null
-    }, def));
-    channels.forEach(buildChannelChain);
-  }
-
-  function recomputeGains(){
-    const anySolo = channels.some(c=>c.solo);
-    channels.forEach(c=>{
-      let g = c.faderValue;
-      if (c.muted) g = 0;
-      if (anySolo && !c.solo) g = 0;
-      c.gainNode.gain.setTargetAtTime(g, getCtx().currentTime, 0.01);
-    });
-  }
-
-  // ---------------- UI build ----------------
-  const rack = document.getElementById('rack');
-  const bridgeRow = document.getElementById('bridgeRow');
-
-  function knobAngle(index, count){ return -135 + (index/(count-1))*270; }
-  function knobFill(index, count){ return (index/(count-1))*270; }
-
-  function renderRack(){
-    rack.innerHTML = '';
-    bridgeRow.innerHTML = '';
-    channels.forEach(ch=>{
-      const strip = document.createElement('div');
-      strip.className = 'strip';
-
-      strip.innerHTML = `
-        <div class="strip-name">${ch.label}</div>
-        <div class="strip-status" id="status-${ch.id}">${ch.id==='lead'||ch.id==='backing' ? 'not split' : 'not rendered'}</div>
-        <div class="knob-row"></div>
-        <div class="vu-fader-row">
-          <div class="vu"><div class="fill" id="vu-${ch.id}"></div></div>
-          <div class="fader-track">
-            <input type="range" min="0" max="1.4" step="0.01" value="${ch.faderValue}" id="fader-${ch.id}">
-          </div>
-        </div>
-        <div class="mute-solo">
-          <button class="ms-btn mute" id="mute-${ch.id}">M</button>
-          <button class="ms-btn solo" id="solo-${ch.id}">S</button>
-        </div>
-        ${ch.hasInterval ? `<button class="btn small gen-btn" id="gen-${ch.id}">Generate</button>` : ''}
-      `;
-
-      const knobRow = strip.querySelector('.knob-row');
-      if (ch.hasInterval){
-        knobRow.appendChild(makeKnob(`Interval`, INTERVALS, ch.intervalSemis===0&&ch.id!=='lead'?0:INTERVALS.findIndex(o=>o.semis===ch.intervalSemis), (idx)=>{
-          ch.intervalSemis = INTERVALS[idx].semis;
-          setStatus(ch.id, 'not rendered (interval changed)');
-        }, `int-${ch.id}`));
-      }
-      if (ch.hasTone){
-        knobRow.appendChild(makeKnob(`Tone`, TONES, ch.toneIndex, (idx)=>{
-          ch.toneIndex = idx;
-          applyTone(ch);
-        }, `tone-${ch.id}`));
-      }
-
-      rack.appendChild(strip);
-
-      // wire fader
-      strip.querySelector(`#fader-${ch.id}`).addEventListener('input', (e)=>{
-        ch.faderValue = parseFloat(e.target.value);
-        recomputeGains();
-      });
-      strip.querySelector(`#mute-${ch.id}`).addEventListener('click', (e)=>{
-        ch.muted = !ch.muted; e.target.classList.toggle('active', ch.muted); recomputeGains();
-      });
-      strip.querySelector(`#solo-${ch.id}`).addEventListener('click', (e)=>{
-        ch.solo = !ch.solo; e.target.classList.toggle('active', ch.solo); recomputeGains();
-      });
-      if (ch.hasInterval){
-        strip.querySelector(`#gen-${ch.id}`).addEventListener('click', ()=>generateHarmony(ch.id));
-      }
-      applyTone(ch);
-
-      // bridge slot
-      const slot = document.createElement('div');
-      slot.className = 'bridge-slot';
-      slot.innerHTML = `
-        <div class="bulb" id="bridge-bulb-${ch.id}"></div>
-        <div class="name">${ch.label}</div>
-        <button class="btn small" id="send-${ch.id}">Send to Part ⇩</button>
-      `;
-      bridgeRow.appendChild(slot);
-      slot.querySelector(`#send-${ch.id}`).addEventListener('click', ()=>sendToPart(ch.id));
-    });
-  }
-
-  function makeKnob(labelText, options, selectedIndex, onChange, idBase){
-    const wrap = document.createElement('div');
-    wrap.className = 'knob-wrap';
-    const idx = selectedIndex>=0?selectedIndex:0;
-    wrap.innerHTML = `
-      <div class="knob-dial" style="--fill:${knobFill(idx, options.length)}deg">
-        <div class="knob-track"></div>
-        <div class="knob-fill"></div>
-        <div class="knob-ticks">
-          <span style="--t:-135deg"></span><span style="--t:0deg"></span><span style="--t:135deg"></span>
-        </div>
-        <div class="knob" id="${idBase}-knob"><div class="pointer" style="--rot:${knobAngle(idx, options.length)}deg"></div></div>
-      </div>
-      <select class="knob-select" id="${idBase}-select">
-        ${options.map((o,i)=>`<option value="${i}" ${i===idx?'selected':''}>${o.label}</option>`).join('')}
-      </select>
-      <div class="knob-label" id="${idBase}-label">${options[idx].label}</div>
-    `;
-    const select = wrap.querySelector('select');
-    const dial = wrap.querySelector('.knob-dial');
-    const pointer = wrap.querySelector('.pointer');
-    const labelEl = wrap.querySelector(`#${idBase}-label`);
-    select.addEventListener('change', ()=>{
-      const i = parseInt(select.value,10);
-      pointer.style.setProperty('--rot', knobAngle(i, options.length)+'deg');
-      dial.style.setProperty('--fill', knobFill(i, options.length)+'deg');
-      labelEl.textContent = options[i].label;
-      onChange(i);
-    });
-    return wrap;
-  }
-
-  function applyTone(ch){
-    if (!ch.hasTone){ ch.filterNode.type='allpass'; return; }
-    const t = TONES[ch.toneIndex];
-    ch.filterNode.type = t.type;
-    ch.filterNode.frequency.setTargetAtTime(t.freq, getCtx().currentTime, 0.01);
-    ch.filterNode.gain.setTargetAtTime(t.gain, getCtx().currentTime, 0.01);
-    ch.filterNode.Q.setTargetAtTime(t.q, getCtx().currentTime, 0.01);
-  }
-
-  function setStatus(id, text){
-    const el = document.getElementById(`status-${id}`);
-    if (el) el.textContent = text;
-  }
-
-  // ---------------- File loading ----------------
-  const dropZone = document.getElementById('dropZone');
-  const fileInput = document.getElementById('fileInput');
-  const fileNameDisplay = document.getElementById('fileName');
-
-  dropZone.addEventListener('click', ()=>fileInput.click());
-  dropZone.addEventListener('dragover', (e)=>{ e.preventDefault(); dropZone.classList.add('drag'); });
-  dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag'));
-  dropZone.addEventListener('drop', (e)=>{
-    e.preventDefault(); dropZone.classList.remove('drag');
-    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener('change', (e)=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
-
-  async function loadFile(file){
-    try{
-      const c = getCtx();
-      const arrBuf = await file.arrayBuffer();
-      const audioBuffer = await c.decodeAudioData(arrBuf.slice(0));
-      state.audioBuffer = audioBuffer;
-      state.sampleRate = audioBuffer.sampleRate;
-      state.vocalMono = null; state.instrumentalMono = null;
-      fileNameDisplay.textContent = file.name || 'recording';
-      if (!channels.length) initChannels();
-      channels.forEach(ch=>{ ch.buffer=null; ch.monoData=null; setStatus(ch.id, ch.id==='lead'||ch.id==='backing' ? 'not split' : 'not rendered'); });
-      document.getElementById('keyReadout').textContent = '— — —';
-    }catch(err){
-      alert('Could not load that audio file: ' + err.message);
-    }
-  }
-
-  // ---------------- Record ----------------
-  document.getElementById('recordBtn').addEventListener('click', async ()=>{
-    const btn = document.getElementById('recordBtn');
-    if (!recording){
-      try{
-        const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-        mediaRecorder = new MediaRecorder(stream);
-        recordedChunks = [];
-        mediaRecorder.ondataavailable = (e)=>recordedChunks.push(e.data);
-        mediaRecorder.onstop = async ()=>{
-          const blob = new Blob(recordedChunks, {type: mediaRecorder.mimeType || 'audio/webm'});
-          const f = new File([blob], 'recording.webm', {type: blob.type});
-          await loadFile(f);
-          stream.getTracks().forEach(t=>t.stop());
-        };
-        mediaRecorder.start();
-        recording = true; btn.classList.add('active'); btn.textContent = '● Stop';
-      }catch(err){
-        alert('Microphone not available in this preview window — try uploading a file instead.');
-      }
-    } else {
-      mediaRecorder.stop();
-      recording = false; btn.classList.remove('active'); btn.textContent = '● Record';
-    }
-  });
-
-  // ---------------- Preview original ----------------
-  document.getElementById('previewBtn').addEventListener('click', ()=>{
-    if (!state.audioBuffer) return alert('Load a file first.');
-    const c = getCtx();
-    if (previewSource){ try{previewSource.stop();}catch(e){} }
-    previewSource = c.createBufferSource();
-    previewSource.buffer = state.audioBuffer;
-    previewSource.connect(c.destination);
-    previewSource.start();
-  });
-  document.getElementById('stopPreviewBtn').addEventListener('click', ()=>{
-    if (previewSource){ try{previewSource.stop();}catch(e){} previewSource=null; }
-  });
-
-  // ---------------- Split ----------------
-  const splitLever = document.getElementById('splitLever');
-  const splitBulb = document.getElementById('splitBulb');
-  const splitCaption = document.getElementById('splitCaption');
-
-  splitLever.addEventListener('click', ()=>{
-    if (!state.audioBuffer) return alert('Load a file first.');
-    splitLever.classList.add('on');
-    splitBulb.classList.add('lit-amber');
-    splitCaption.innerHTML = 'ISOLATING…';
-    setTimeout(()=>{
-      const { vocal, instrumental } = Engine.isolateVocal(state.audioBuffer);
-      state.vocalMono = vocal; state.instrumentalMono = instrumental;
-      const lead = channels.find(c=>c.id==='lead');
-      const backing = channels.find(c=>c.id==='backing');
-      lead.buffer = Engine.monoToBuffer(vocal, state.sampleRate); lead.monoData = vocal;
-      backing.buffer = Engine.monoToBuffer(instrumental, state.sampleRate); backing.monoData = instrumental;
-      setStatus('lead', '● split');
-      setStatus('backing', '● split');
-      splitBulb.classList.remove('lit-amber'); splitBulb.classList.add('lit-green');
-      splitCaption.innerHTML = 'SPLIT<br>DONE';
-      runKeyDetect();
-    }, 250);
-  });
-
-  function runKeyDetect(){
-    if (!state.vocalMono) return;
-    document.getElementById('keyReadout').textContent = 'ANALYZING…';
-    setTimeout(()=>{
-      const key = Engine.detectKey(state.vocalMono, state.sampleRate);
-      document.getElementById('keyReadout').textContent = key || 'UNCLEAR — set manually';
-    }, 30);
-  }
-  document.getElementById('analyzeKeyBtn').addEventListener('click', runKeyDetect);
-
-  // ---------------- Generate harmony ----------------
-  async function generateHarmony(chId){
-    if (!state.vocalMono) return alert('Split the vocals first.');
-    const ch = channels.find(c=>c.id===chId);
-    setStatus(chId, 'RENDERING…');
-    await new Promise(r=>setTimeout(r, 20));
-    const shifted = Engine.pitchShift(state.vocalMono, ch.intervalSemis, state.sampleRate);
-    ch.monoData = shifted;
-    ch.buffer = Engine.monoToBuffer(shifted, state.sampleRate);
-    setStatus(chId, '● rendered');
-  }
-
-  // ---------------- Transport ----------------
-  function stopAll(){
-    channels.forEach(ch=>{ if (ch.sourceNode){ try{ch.sourceNode.stop();}catch(e){} ch.sourceNode=null; } });
-    playing = false;
-  }
-  document.getElementById('playAllBtn').addEventListener('click', ()=>{
-    if (!state.audioBuffer) return alert('Load and split a file first.');
-    stopAll();
-    const c = getCtx();
-    const startAt = c.currentTime + 0.12;
-    let any = false;
-    channels.forEach(ch=>{
-      if (!ch.buffer) return;
-      any = true;
-      const src = c.createBufferSource();
-      src.buffer = ch.buffer;
-      src.connect(ch.gainNode);
-      src.start(startAt);
-      ch.sourceNode = src;
-      src.onended = ()=>{ ch.sourceNode = null; };
-    });
-    if (!any) return alert('Nothing rendered yet — split the vocals and generate at least one part.');
-    playing = true;
-  });
-  document.getElementById('stopAllBtn').addEventListener('click', stopAll);
-
-  // ---------------- VU meters ----------------
-  function vuLoop(){
-    channels.forEach(ch=>{
-      const el = document.getElementById(`vu-${ch.id}`);
-      if (!el) return;
-      if (!ch.analyser){ el.style.height='0%'; return; }
-      const data = new Uint8Array(ch.analyser.fftSize);
-      ch.analyser.getByteTimeDomainData(data);
-      let peak = 0;
-      for (let i=0;i<data.length;i++) peak = Math.max(peak, Math.abs(data[i]-128)/128);
-      el.style.height = Math.min(100, peak*130) + '%';
-    });
-    requestAnimationFrame(vuLoop);
-  }
-  requestAnimationFrame(vuLoop);
-
-  // ---------------- Send to part / export ----------------
-  function sendToPart(chId){
-    const ch = channels.find(c=>c.id===chId);
-    if (!ch.buffer) return alert('Nothing to send yet — split or generate this part first.');
-    const bulb = document.getElementById(`bridge-bulb-${chId}`);
-    bulb.classList.add('lit-green');
-    setTimeout(()=>bulb.classList.remove('lit-green'), 700);
-    const blob = encodeWAV(ch.buffer);
-    downloadBlob(blob, `${chId}-part.wav`);
-  }
-
-  document.getElementById('exportMasterBtn').addEventListener('click', async ()=>{
-    const rendered = channels.filter(c=>c.buffer);
-    if (!rendered.length) return alert('Nothing rendered yet.');
-    const length = Math.max(...rendered.map(c=>c.buffer.length));
-    const offline = new OfflineAudioContext(2, length, state.sampleRate);
-    const anySolo = channels.some(c=>c.solo);
-    rendered.forEach(ch=>{
-      const g = ch.muted || (anySolo && !ch.solo) ? 0 : ch.faderValue;
-      if (g<=0) return;
-      const src = offline.createBufferSource(); src.buffer = ch.buffer;
-      const gain = offline.createGain(); gain.gain.value = g;
-      const filt = offline.createBiquadFilter();
-      filt.type = ch.filterNode.type;
-      filt.frequency.value = ch.filterNode.frequency.value;
-      filt.gain.value = ch.filterNode.gain.value;
-      filt.Q.value = ch.filterNode.Q.value;
-      src.connect(gain); gain.connect(filt); filt.connect(offline.destination);
-      src.start(0);
-    });
-    const renderedBuf = await offline.startRendering();
-    downloadBlob(encodeWAV(renderedBuf), 'harmony-master-mix.wav');
-  });
-
-  document.getElementById('exportAllBtn').addEventListener('click', async ()=>{
-    const rendered = channels.filter(c=>c.buffer);
-    if (!rendered.length) return alert('Nothing rendered yet.');
-    const zip = new JSZip();
-    rendered.forEach(ch=>{ zip.file(`${ch.id}-stem.wav`, encodeWAV(ch.buffer)); });
-    const content = await zip.generateAsync({type:'blob'});
-    downloadBlob(content, 'harmony-stems.zip');
-  });
-
-  // ---------------- Cloud AI Voice Engine (DiffSinger) ----------------
-  function cloudUrl(){
-    return document.getElementById('cloudApiUrl').value.trim().replace(/\/+$/,'');
-  }
-
-  document.getElementById('cloudHealthBtn').addEventListener('click', async ()=>{
-    const statusEl = document.getElementById('cloudHealthStatus');
-    const base = cloudUrl();
-    if (!base){ statusEl.textContent = 'enter a URL first'; return; }
-    statusEl.textContent = 'checking…';
-    try{
-      const res = await fetch(base + '/health');
-      const data = await res.json();
-      statusEl.textContent = data.model_loaded ? '✓ connected, model loaded' : '✓ connected, model still loading';
-    }catch(err){
-      statusEl.textContent = '✗ unreachable — check URL, CORS, and that the server is running';
-    }
-  });
-
-  document.getElementById('cloudRenderBtn').addEventListener('click', async ()=>{
-    const statusEl = document.getElementById('cloudRenderStatus');
-    const base = cloudUrl();
-    if (!base){ statusEl.textContent = 'enter your server URL above first'; return; }
-
-    const partId = document.getElementById('cloudTargetPart').value;
-    const lyrics = document.getElementById('cloudLyrics').value.trim();
-    const notesRaw = document.getElementById('cloudNotes').value.trim();
-    const dursRaw = document.getElementById('cloudDurations').value.trim();
-    if (!lyrics || !notesRaw || !dursRaw){ statusEl.textContent = 'fill in lyrics, notes, and durations'; return; }
-
-    const notes = notesRaw.split(',').map(s=>s.trim()).filter(Boolean);
-    const durations = dursRaw.split(',').map(s=>parseFloat(s.trim())).filter(n=>!isNaN(n));
-    if (notes.length !== durations.length){ statusEl.textContent = 'notes and durations must have the same count'; return; }
-
-    const ch = channels.find(c=>c.id===partId);
-    statusEl.textContent = 'rendering on cloud GPU… this can take several seconds';
-    setStatus(partId, 'RENDERING (cloud)…');
-
-    try{
-      const res = await fetch(base + '/synthesize', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ lyrics, notes, durations })
-      });
-      if (!res.ok){
-        const errBody = await res.json().catch(()=>({detail:res.statusText}));
-        throw new Error(errBody.detail || 'request failed');
-      }
-      const data = await res.json();
-      const audioRes = await fetch(base + data.audio_url);
-      const arrBuf = await audioRes.arrayBuffer();
-      const decoded = await getCtx().decodeAudioData(arrBuf.slice(0));
-
-      ch.buffer = decoded;
-      ch.monoData = null; // came from the server, not local pitch-shift — no raw samples to re-export via that path
-      setStatus(partId, '● AI rendered (cloud)');
-      statusEl.textContent = '✓ done — ' + ch.label + ' updated';
-    }catch(err){
-      setStatus(partId, 'cloud render failed');
-      statusEl.textContent = '✗ ' + err.message;
-    }
-  });
-
-
-  initChannels();
-  renderRack();
-
-})();
-</script>
 </body>
 </html>
