@@ -1,0 +1,10 @@
+# These cover the FastAPI wrapper layer only.
+# DiffSingerMiniEngine's own requirements.txt (from the cloned repo) must
+# also be installed — see DEPLOY.md Step 2. Install that one first, this
+# one second, so neither silently overwrites the other's pinned versions.
+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+python-multipart>=0.0.9
+onnxruntime-gpu>=1.17
