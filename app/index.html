@@ -388,10 +388,12 @@ input[type=file]{display:none;}
   box-shadow:inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
 }
 .timeline-readout{
-  display:flex;justify-content:center;gap:6px;margin-top:8px;
+  display:flex;justify-content:center;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;
   font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);letter-spacing:1px;
 }
 .timeline-readout b{color:var(--accent-deep);font-weight:700;}
+.loop-readout{color:var(--accent-deep);font-weight:700;}
+.timeline-hint{text-align:center;font-size:10px;color:var(--ink-soft);letter-spacing:.4px;margin-top:6px;opacity:.75;}
 
 .bridge-slot-label{
   display:block;font-family:'Manrope',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.5px;
@@ -506,12 +508,19 @@ input[type=file]{display:none;}
     <div class="panel-label">Harmony Mixer — Lead / Soprano / Alto / Tenor / Backing</div>
     <div class="timeline-wrap">
       <canvas class="timeline-canvas" id="waveformCanvas" height="64"></canvas>
-      <div class="timeline-readout"><b id="timeCurrent">0:00</b><span>/</span><span id="timeTotal">0:00</span></div>
+      <div class="timeline-readout">
+        <b id="timeCurrent">0:00</b><span>/</span><span id="timeTotal">0:00</span>
+        <span class="loop-readout" id="loopReadout"></span>
+        <button class="btn small" id="clearLoopBtn" style="display:none;">✕ Clear Loop</button>
+      </div>
+      <div class="timeline-hint">Click to seek • Drag across the waveform to set a loop region</div>
     </div>
     <div class="rack" id="rack"></div>
     <div class="master-row" style="margin-top:16px;">
       <button class="btn amber" id="playAllBtn">▶ Play Mix</button>
       <button class="btn" id="stopAllBtn">■ Stop</button>
+      <button class="btn" id="undoBtn" title="Undo (Ctrl/Cmd+Z)" disabled>↺ Undo</button>
+      <button class="btn" id="redoBtn" title="Redo (Ctrl/Cmd+Shift+Z)" disabled>↻ Redo</button>
       <button class="btn" id="exportMasterBtn">⇩ Export Master (WAV)</button>
       <button class="btn" id="exportAllBtn">⇩ Export All Stems (ZIP)</button>
     </div>
@@ -758,6 +767,16 @@ input[type=file]{display:none;}
     drawPeaksBars(ctx2d, w, h, waveformPeaks, '#6c79ef');
     if (state.audioBuffer){
       const dur = state.audioBuffer.duration;
+
+      if (state.loopStart != null && state.loopEnd != null && dur > 0){
+        const x1 = (state.loopStart/dur)*w, x2 = (state.loopEnd/dur)*w;
+        ctx2d.fillStyle = 'rgba(108,121,239,0.16)';
+        ctx2d.fillRect(x1, 0, x2-x1, h);
+        ctx2d.strokeStyle = 'rgba(108,121,239,0.55)';
+        ctx2d.lineWidth = 1;
+        ctx2d.strokeRect(x1+0.5, 0.5, Math.max(1,x2-x1-1), h-1);
+      }
+
       const t = currentPlayheadTime();
       const frac = dur>0 ? Math.min(1, t/dur) : 0;
       ctx2d.strokeStyle = '#ef7f7f';
@@ -768,6 +787,26 @@ input[type=file]{display:none;}
       ctx2d.stroke();
       document.getElementById('timeCurrent').textContent = fmtTime(t);
       document.getElementById('timeTotal').textContent = fmtTime(dur);
+
+      // loop playback: jump back to loop start once we pass loop end
+      if (playing && state.loopActive && state.loopEnd != null && state.loopEnd - state.loopStart > 0.05){
+        if (t >= state.loopEnd - 0.03){
+          state.playOffset = state.loopStart;
+          startPlayback();
+        }
+      }
+    }
+  }
+  function updateLoopUI(){
+    const readout = document.getElementById('loopReadout');
+    const clearBtn = document.getElementById('clearLoopBtn');
+    if (!readout || !clearBtn) return;
+    if (state.loopActive && state.loopStart != null && state.loopEnd != null){
+      readout.textContent = `⟲ ${fmtTime(state.loopStart)}–${fmtTime(state.loopEnd)}`;
+      clearBtn.style.display = 'inline-flex';
+    } else {
+      readout.textContent = '';
+      clearBtn.style.display = 'none';
     }
   }
 
@@ -885,7 +924,7 @@ self.onmessage = function(e){
     {id:'backing', label:'BACKING', hasInterval:false, hasTone:false, defaultFader:0.7},
   ];
 
-  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null, playOffset:0, playStartCtxTime:null, playOffsetAtStart:0 };
+  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null, playOffset:0, playStartCtxTime:null, playOffsetAtStart:0, loopStart:null, loopEnd:null, loopActive:false };
   let channels = [];
   let masterGain = null;
   let playing = false;
@@ -911,7 +950,7 @@ self.onmessage = function(e){
       faderValue: def.defaultFader,
       intervalSemis: def.defaultInterval || 0,
       toneIndex: 0,
-      sourceNode:null
+      sourceNode:null, previewNode:null
     }, def));
     channels.forEach(buildChannelChain);
   }
@@ -926,6 +965,80 @@ self.onmessage = function(e){
       const stripEl = document.getElementById(`strip-${c.id}`);
       if (stripEl) stripEl.classList.toggle('bypassed', anySolo && !c.solo && !c.muted);
     });
+  }
+
+  // ---------------- Undo / redo (mixer & tone state) ----------------
+  const historyStack = [];
+  const redoStack = [];
+  const MAX_HISTORY = 50;
+  let restoringHistory = false;
+
+  function snapshotState(){
+    return channels.map(ch => ({
+      id: ch.id, faderValue: ch.faderValue, intervalSemis: ch.intervalSemis,
+      toneIndex: ch.toneIndex, muted: ch.muted, solo: ch.solo
+    }));
+  }
+  function applySnapshot(snap){
+    restoringHistory = true;
+    snap.forEach(s=>{
+      const ch = channels.find(c=>c.id===s.id);
+      if (!ch) return;
+      ch.faderValue = s.faderValue; ch.intervalSemis = s.intervalSemis;
+      ch.toneIndex = s.toneIndex; ch.muted = s.muted; ch.solo = s.solo;
+    });
+    renderRack();
+    recomputeGains();
+    restoringHistory = false;
+  }
+  function pushHistory(){
+    if (restoringHistory) return;
+    historyStack.push(snapshotState());
+    if (historyStack.length > MAX_HISTORY) historyStack.shift();
+    redoStack.length = 0;
+    updateUndoRedoButtons();
+  }
+  function undo(){
+    if (!historyStack.length) return;
+    redoStack.push(snapshotState());
+    applySnapshot(historyStack.pop());
+    updateUndoRedoButtons();
+  }
+  function redo(){
+    if (!redoStack.length) return;
+    historyStack.push(snapshotState());
+    applySnapshot(redoStack.pop());
+    updateUndoRedoButtons();
+  }
+  function updateUndoRedoButtons(){
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    if (undoBtn) undoBtn.disabled = !historyStack.length;
+    if (redoBtn) redoBtn.disabled = !redoStack.length;
+  }
+  window.addEventListener('keydown', (e)=>{
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod || e.key.toLowerCase() !== 'z') return;
+    e.preventDefault();
+    if (e.shiftKey) redo(); else undo();
+  });
+
+  // ---------------- Live tone preview ----------------
+  function startTonePreview(ch){
+    if (playing || !ch.buffer) return; // mix already playing through this chain — nothing extra needed
+    stopTonePreview(ch);
+    const c = getCtx();
+    const src = c.createBufferSource();
+    src.buffer = ch.buffer;
+    src.loop = true;
+    src.connect(ch.gainNode);
+    src.start();
+    ch.previewNode = src;
+  }
+  function stopTonePreview(ch){
+    if (ch.previewNode){ try{ ch.previewNode.stop(); }catch(e){} ch.previewNode = null; }
   }
 
   // ---------------- UI build ----------------
@@ -955,8 +1068,8 @@ self.onmessage = function(e){
           </div>
         </div>
         <div class="mute-solo">
-          <button class="ms-btn mute" id="mute-${ch.id}">M</button>
-          <button class="ms-btn solo" id="solo-${ch.id}">S</button>
+          <button class="ms-btn mute${ch.muted ? ' active' : ''}" id="mute-${ch.id}">M</button>
+          <button class="ms-btn solo${ch.solo ? ' active' : ''}" id="solo-${ch.id}">S</button>
         </div>
         ${ch.hasInterval ? `<button class="btn small gen-btn" id="gen-${ch.id}">Generate</button>` : ''}
       `;
@@ -966,26 +1079,38 @@ self.onmessage = function(e){
         knobRow.appendChild(makeKnob(`Interval`, INTERVALS, ch.intervalSemis===0&&ch.id!=='lead'?0:INTERVALS.findIndex(o=>o.semis===ch.intervalSemis), (idx)=>{
           ch.intervalSemis = INTERVALS[idx].semis;
           setStatus(ch.id, 'not rendered (interval changed)');
-        }, `int-${ch.id}`));
+        }, `int-${ch.id}`, { onBeforeChange: pushHistory }));
       }
       if (ch.hasTone){
         knobRow.appendChild(makeKnob(`Tone`, TONES, ch.toneIndex, (idx)=>{
           ch.toneIndex = idx;
           applyTone(ch);
-        }, `tone-${ch.id}`));
+        }, `tone-${ch.id}`, {
+          onBeforeChange: pushHistory,
+          onInteractionStart: ()=>startTonePreview(ch),
+          onInteractionEnd: ()=>stopTonePreview(ch)
+        }));
       }
 
       rack.appendChild(strip);
 
       // wire fader
-      strip.querySelector(`#fader-${ch.id}`).addEventListener('input', (e)=>{
+      const faderInput = strip.querySelector(`#fader-${ch.id}`);
+      let faderHistoryPushed = false;
+      const pushFaderHistoryOnce = ()=>{ if (!faderHistoryPushed){ pushHistory(); faderHistoryPushed = true; } };
+      faderInput.addEventListener('mousedown', pushFaderHistoryOnce);
+      faderInput.addEventListener('touchstart', pushFaderHistoryOnce, {passive:true});
+      faderInput.addEventListener('input', (e)=>{
         ch.faderValue = parseFloat(e.target.value);
         recomputeGains();
       });
+      faderInput.addEventListener('change', ()=>{ faderHistoryPushed = false; });
       strip.querySelector(`#mute-${ch.id}`).addEventListener('click', (e)=>{
+        pushHistory();
         ch.muted = !ch.muted; e.target.classList.toggle('active', ch.muted); recomputeGains();
       });
       strip.querySelector(`#solo-${ch.id}`).addEventListener('click', (e)=>{
+        pushHistory();
         ch.solo = !ch.solo; e.target.classList.toggle('active', ch.solo); recomputeGains();
       });
       if (ch.hasInterval){
@@ -1006,7 +1131,8 @@ self.onmessage = function(e){
     });
   }
 
-  function makeKnob(labelText, options, selectedIndex, onChange, idBase){
+  function makeKnob(labelText, options, selectedIndex, onChange, idBase, hooks){
+    hooks = hooks || {};
     const wrap = document.createElement('div');
     wrap.className = 'knob-wrap';
     let idx = selectedIndex>=0?selectedIndex:0;
@@ -1040,6 +1166,17 @@ self.onmessage = function(e){
 
     const SENS = 12; // px of vertical drag per step
     let dragging = false, startY = 0, startIdx = 0;
+    let endTimer = null;
+
+    function beginInteraction(){
+      if (hooks.onBeforeChange) hooks.onBeforeChange();
+      clearTimeout(endTimer);
+      if (hooks.onInteractionStart) hooks.onInteractionStart();
+    }
+    function scheduleEnd(delay){
+      clearTimeout(endTimer);
+      endTimer = setTimeout(()=>{ if (hooks.onInteractionEnd) hooks.onInteractionEnd(); }, delay);
+    }
 
     function onMove(e){
       if (!dragging) return;
@@ -1056,6 +1193,7 @@ self.onmessage = function(e){
       window.removeEventListener('mouseup', onUp);
       window.removeEventListener('touchmove', onMove);
       window.removeEventListener('touchend', onUp);
+      scheduleEnd(600);
     }
     function onDown(e){
       dragging = true;
@@ -1063,6 +1201,7 @@ self.onmessage = function(e){
       startIdx = idx;
       dial.classList.add('dragging');
       dial.focus();
+      beginInteraction();
       window.addEventListener('mousemove', onMove, {passive:false});
       window.addEventListener('mouseup', onUp);
       window.addEventListener('touchmove', onMove, {passive:false});
@@ -1072,11 +1211,13 @@ self.onmessage = function(e){
     dial.addEventListener('mousedown', onDown);
     dial.addEventListener('touchstart', onDown, {passive:false});
     dial.addEventListener('keydown', (e)=>{
-      if (e.key==='ArrowUp' || e.key==='ArrowRight'){ setIndex(idx+1); e.preventDefault(); }
-      else if (e.key==='ArrowDown' || e.key==='ArrowLeft'){ setIndex(idx-1); e.preventDefault(); }
+      if (e.key==='ArrowUp' || e.key==='ArrowRight'){ beginInteraction(); setIndex(idx+1); scheduleEnd(900); e.preventDefault(); }
+      else if (e.key==='ArrowDown' || e.key==='ArrowLeft'){ beginInteraction(); setIndex(idx-1); scheduleEnd(900); e.preventDefault(); }
     });
     dial.addEventListener('wheel', (e)=>{
+      beginInteraction();
       setIndex(idx + (e.deltaY < 0 ? 1 : -1));
+      scheduleEnd(900);
       e.preventDefault();
     }, {passive:false});
 
@@ -1113,17 +1254,59 @@ self.onmessage = function(e){
 
   // ---------------- Timeline scrubbing ----------------
   const waveformCanvas = document.getElementById('waveformCanvas');
-  waveformCanvas.addEventListener('click', (e)=>{
-    if (!state.audioBuffer) return;
-    const rect = waveformCanvas.getBoundingClientRect();
-    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const t = frac * state.audioBuffer.duration;
+  function timelineFracFromEvent(e, rect){
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  }
+  function seekTo(t){
     const wasPlaying = playing;
     if (wasPlaying) stopAll();
     state.playOffset = t;
     drawTimeline();
     if (wasPlaying) startPlayback();
+  }
+  function startTimelinePointer(e){
+    if (!state.audioBuffer) return;
+    const rect = waveformCanvas.getBoundingClientRect();
+    const startFrac = timelineFracFromEvent(e, rect);
+    let dragged = false;
+    function onMove(e2){
+      const frac2 = timelineFracFromEvent(e2, rect);
+      if (Math.abs(frac2 - startFrac) > 0.008) dragged = true;
+      if (dragged){
+        const a = Math.min(startFrac, frac2) * state.audioBuffer.duration;
+        const b = Math.max(startFrac, frac2) * state.audioBuffer.duration;
+        state.loopStart = a; state.loopEnd = b;
+        drawTimeline();
+      }
+      e2.preventDefault();
+    }
+    function onEnd(e2){
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+      if (dragged){
+        state.loopActive = true;
+        updateLoopUI();
+        drawTimeline();
+      } else {
+        seekTo(startFrac * state.audioBuffer.duration);
+      }
+    }
+    window.addEventListener('mousemove', onMove, {passive:false});
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove, {passive:false});
+    window.addEventListener('touchend', onEnd);
+  }
+  waveformCanvas.addEventListener('mousedown', startTimelinePointer);
+  waveformCanvas.addEventListener('touchstart', startTimelinePointer, {passive:true});
+  document.getElementById('clearLoopBtn').addEventListener('click', ()=>{
+    state.loopActive = false; state.loopStart = null; state.loopEnd = null;
+    updateLoopUI(); drawTimeline();
   });
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('redoBtn').addEventListener('click', redo);
 
   async function loadFile(file){
     try{
