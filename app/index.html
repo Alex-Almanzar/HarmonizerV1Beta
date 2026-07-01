@@ -283,7 +283,9 @@ body{
   box-shadow:0 0 5px rgba(180,140,242,.7);
   transform:translateX(-50%);
 }
-.knob-select{position:absolute;top:0;left:0;width:58px;height:58px;opacity:0;cursor:pointer;}
+.knob-dial{cursor:ns-resize;touch-action:none;-webkit-user-select:none;user-select:none;}
+.knob-dial:focus-visible{outline:2px solid var(--accent-deep);outline-offset:3px;border-radius:50%;}
+.knob-dial.dragging .knob{box-shadow:2px 2px 6px var(--shadow-dark), -2px -2px 6px var(--shadow-light), 0 0 0 3px rgba(108,121,239,0.3);}
 .knob-label{font-family:'JetBrains Mono',monospace;font-size:8px;color:var(--accent-deep);letter-spacing:.3px;text-align:center;margin-top:4px;min-height:10px;}
 
 .vu-fader-row{display:flex;gap:8px;align-items:flex-end;}
@@ -325,6 +327,8 @@ body{
 }
 
 .mute-solo{display:flex;gap:6px;}
+.strip.bypassed .vu, .strip.bypassed .fader-track{opacity:.32;transition:opacity .2s ease;}
+.strip.bypassed .strip-name{opacity:.55;transition:opacity .2s ease;}
 .ms-btn{
   width:34px;height:26px;border-radius:9px;border:none;
   font-family:'Manrope',sans-serif;font-size:10px;font-weight:800;
@@ -368,6 +372,26 @@ body{
 .info-note b{color:var(--accent-deep);}
 
 input[type=file]{display:none;}
+
+.progress-bar{width:100%;height:5px;border-radius:3px;background:var(--surface-sunken);box-shadow:inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);overflow:hidden;margin-top:6px;display:none;}
+.progress-bar.active{display:block;}
+.progress-bar .fill{height:100%;width:0%;background:var(--iridescent);background-size:300% 300%;animation:shimmer 3s ease-in-out infinite;transition:width .15s ease;}
+
+.file-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);letter-spacing:.4px;min-height:13px;}
+.file-meta .warn{color:var(--bad);font-weight:700;}
+.drop-waveform{width:100%;max-width:230px;margin-top:6px;border-radius:6px;display:none;}
+
+.timeline-wrap{margin-bottom:16px;}
+.timeline-canvas{
+  width:100%;height:64px;display:block;border-radius:14px;cursor:pointer;
+  background:var(--surface-sunken);
+  box-shadow:inset 5px 5px 10px var(--shadow-dark), inset -5px -5px 10px var(--shadow-light);
+}
+.timeline-readout{
+  display:flex;justify-content:center;gap:6px;margin-top:8px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);letter-spacing:1px;
+}
+.timeline-readout b{color:var(--accent-deep);font-weight:700;}
 
 .bridge-slot-label{
   display:block;font-family:'Manrope',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.5px;
@@ -438,6 +462,8 @@ input[type=file]{display:none;}
         <div class="dropzone" id="dropZone">
           <div class="hint">Drop an audio file, or click to browse</div>
           <div class="fname" id="fileName">No file loaded</div>
+          <div class="file-meta" id="fileMeta"></div>
+          <canvas class="drop-waveform" id="dropWaveform" height="30"></canvas>
         </div>
         <input type="file" id="fileInput" accept="audio/*">
         <div class="transport">
@@ -455,6 +481,7 @@ input[type=file]{display:none;}
           <div class="bulb-stack">
             <div class="bulb" id="splitBulb"></div>
             <div class="bulb-caption" id="splitCaption">ISOLATE<br>VOCAL</div>
+            <div class="progress-bar" id="progress-split"><div class="fill"></div></div>
           </div>
         </div>
       </div>
@@ -477,6 +504,10 @@ input[type=file]{display:none;}
   <!-- MIXER RACK -->
   <div class="panel">
     <div class="panel-label">Harmony Mixer — Lead / Soprano / Alto / Tenor / Backing</div>
+    <div class="timeline-wrap">
+      <canvas class="timeline-canvas" id="waveformCanvas" height="64"></canvas>
+      <div class="timeline-readout"><b id="timeCurrent">0:00</b><span>/</span><span id="timeTotal">0:00</span></div>
+    </div>
     <div class="rack" id="rack"></div>
     <div class="master-row" style="margin-top:16px;">
       <button class="btn amber" id="playAllBtn">▶ Play Mix</button>
@@ -670,6 +701,159 @@ input[type=file]{display:none;}
     setTimeout(()=>URL.revokeObjectURL(url), 3000);
   }
 
+  // ---------------- Waveform helpers ----------------
+  function fmtTime(s){
+    if (!isFinite(s) || s<0) s = 0;
+    const m = Math.floor(s/60), sec = Math.floor(s%60);
+    return m + ':' + String(sec).padStart(2,'0');
+  }
+  function mixDown(buffer){
+    const len = buffer.length;
+    const out = new Float32Array(len);
+    for (let c=0;c<buffer.numberOfChannels;c++){
+      const d = buffer.getChannelData(c);
+      for (let i=0;i<len;i++) out[i] += d[i]/buffer.numberOfChannels;
+    }
+    return out;
+  }
+  function computePeaks(buffer, numBuckets){
+    const data = buffer.numberOfChannels>1 ? mixDown(buffer) : buffer.getChannelData(0);
+    const bucketSize = Math.max(1, Math.floor(data.length/numBuckets));
+    const peaks = new Float32Array(numBuckets);
+    for (let i=0;i<numBuckets;i++){
+      let max = 0;
+      const start = i*bucketSize, end = Math.min(data.length, start+bucketSize);
+      for (let j=start;j<end;j++){ const v = Math.abs(data[j]); if (v>max) max=v; }
+      peaks[i] = max;
+    }
+    return peaks;
+  }
+  function drawPeaksBars(ctx2d, w, h, peaks, color){
+    ctx2d.clearRect(0,0,w,h);
+    if (!peaks || !w || !h) return;
+    const n = peaks.length;
+    const barW = w/n;
+    ctx2d.fillStyle = color;
+    for (let i=0;i<n;i++){
+      const barH = Math.max(1, peaks[i]*h*0.88);
+      ctx2d.fillRect(i*barW, (h-barH)/2, Math.max(1, barW-1), barH);
+    }
+  }
+
+  let waveformPeaks = null;
+
+  function resizeTimelineCanvas(){
+    const canvas = document.getElementById('waveformCanvas');
+    if (!canvas || !canvas.clientWidth) return;
+    canvas.width = canvas.clientWidth;
+    drawTimeline();
+  }
+  window.addEventListener('resize', resizeTimelineCanvas);
+
+  function drawTimeline(){
+    const canvas = document.getElementById('waveformCanvas');
+    if (!canvas) return;
+    const w = canvas.width, h = canvas.height;
+    const ctx2d = canvas.getContext('2d');
+    drawPeaksBars(ctx2d, w, h, waveformPeaks, '#6c79ef');
+    if (state.audioBuffer){
+      const dur = state.audioBuffer.duration;
+      const t = currentPlayheadTime();
+      const frac = dur>0 ? Math.min(1, t/dur) : 0;
+      ctx2d.strokeStyle = '#ef7f7f';
+      ctx2d.lineWidth = 2;
+      ctx2d.beginPath();
+      ctx2d.moveTo(frac*w, 0);
+      ctx2d.lineTo(frac*w, h);
+      ctx2d.stroke();
+      document.getElementById('timeCurrent').textContent = fmtTime(t);
+      document.getElementById('timeTotal').textContent = fmtTime(dur);
+    }
+  }
+
+  // ---------------- DSP Web Worker (non-blocking split / pitch-shift) ----------------
+  const WORKER_SRC = `
+self.onmessage = function(e){
+  const msg = e.data;
+  if (msg.type === 'isolate'){
+    const { left, right, length } = msg;
+    const vocal = new Float32Array(length);
+    const instrumental = new Float32Array(length);
+    const step = Math.max(1, Math.floor(length/25));
+    for (let i=0;i<length;i++){
+      vocal[i] = (left[i]+right[i])/2;
+      instrumental[i] = (left[i]-right[i])/2;
+      if (i % step === 0) self.postMessage({type:'progress', pct: Math.round((i/length)*100)});
+    }
+    self.postMessage({type:'progress', pct:100});
+    self.postMessage({type:'done', vocal, instrumental}, [vocal.buffer, instrumental.buffer]);
+  } else if (msg.type === 'pitchShift'){
+    const { input, semitones, length } = msg;
+    if (!semitones){
+      self.postMessage({type:'progress', pct:100});
+      self.postMessage({type:'done', output: input}, [input.buffer]);
+      return;
+    }
+    const ratio = Math.pow(2, semitones/12);
+    const grainSize = 4096, hop = grainSize/4;
+    const output = new Float32Array(length);
+    const win = new Float32Array(grainSize);
+    for (let i=0;i<grainSize;i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(grainSize-1));
+    const totalPos = Math.max(1, Math.floor((length-grainSize)/hop));
+    let posCount = 0;
+    for (let pos=0; pos+grainSize<length; pos+=hop){
+      for (let i=0;i<grainSize;i++){
+        const srcPos = pos + i*ratio;
+        const idx = Math.floor(srcPos), frac = srcPos-idx;
+        let s = 0;
+        if (idx+1 < length) s = input[idx]*(1-frac) + input[idx+1]*frac;
+        else if (idx < length) s = input[idx];
+        const o = pos+i;
+        if (o < output.length) output[o] += s*win[i];
+      }
+      posCount++;
+      if (posCount % 8 === 0) self.postMessage({type:'progress', pct: Math.round((posCount/totalPos)*100)});
+    }
+    let peak = 0;
+    for (let i=0;i<output.length;i++) peak = Math.max(peak, Math.abs(output[i]));
+    if (peak > 0){ const norm = 0.92/peak; for (let i=0;i<output.length;i++) output[i]*=norm; }
+    self.postMessage({type:'progress', pct:100});
+    self.postMessage({type:'done', output}, [output.buffer]);
+  }
+};
+`;
+  function runDSPTask(payload, onProgress){
+    return new Promise((resolve, reject)=>{
+      let worker;
+      try{
+        const blob = new Blob([WORKER_SRC], {type:'application/javascript'});
+        worker = new Worker(URL.createObjectURL(blob));
+      }catch(err){ reject(err); return; }
+      worker.onmessage = (e)=>{
+        const msg = e.data;
+        if (msg.type === 'progress'){ onProgress && onProgress(msg.pct); }
+        else if (msg.type === 'done'){ worker.terminate(); resolve(msg); }
+      };
+      worker.onerror = (err)=>{ worker.terminate(); reject(err); };
+      const transfer = [];
+      if (payload.left) transfer.push(payload.left.buffer);
+      if (payload.right) transfer.push(payload.right.buffer);
+      if (payload.input) transfer.push(payload.input.buffer);
+      worker.postMessage(payload, transfer);
+    });
+  }
+  function showProgress(id, pct){
+    const bar = document.getElementById(`progress-${id}`);
+    if (!bar) return;
+    bar.classList.add('active');
+    bar.querySelector('.fill').style.width = pct + '%';
+  }
+  function hideProgress(id){
+    const bar = document.getElementById(`progress-${id}`);
+    if (!bar) return;
+    setTimeout(()=>{ bar.classList.remove('active'); bar.querySelector('.fill').style.width = '0%'; }, 450);
+  }
+
   // ---------------- App state ----------------
   const INTERVALS = [
     {label:'Unison', semis:0},
@@ -701,7 +885,7 @@ input[type=file]{display:none;}
     {id:'backing', label:'BACKING', hasInterval:false, hasTone:false, defaultFader:0.7},
   ];
 
-  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null };
+  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null, playOffset:0, playStartCtxTime:null, playOffsetAtStart:0 };
   let channels = [];
   let masterGain = null;
   let playing = false;
@@ -739,6 +923,8 @@ input[type=file]{display:none;}
       if (c.muted) g = 0;
       if (anySolo && !c.solo) g = 0;
       c.gainNode.gain.setTargetAtTime(g, getCtx().currentTime, 0.01);
+      const stripEl = document.getElementById(`strip-${c.id}`);
+      if (stripEl) stripEl.classList.toggle('bypassed', anySolo && !c.solo && !c.muted);
     });
   }
 
@@ -755,10 +941,12 @@ input[type=file]{display:none;}
     channels.forEach(ch=>{
       const strip = document.createElement('div');
       strip.className = 'strip';
+      strip.id = `strip-${ch.id}`;
 
       strip.innerHTML = `
         <div class="strip-name">${ch.label}</div>
         <div class="strip-status" id="status-${ch.id}">${ch.id==='lead'||ch.id==='backing' ? 'not split' : 'not rendered'}</div>
+        <div class="progress-bar" id="progress-${ch.id}"><div class="fill"></div></div>
         <div class="knob-row"></div>
         <div class="vu-fader-row">
           <div class="vu"><div class="fill" id="vu-${ch.id}"></div></div>
@@ -821,9 +1009,11 @@ input[type=file]{display:none;}
   function makeKnob(labelText, options, selectedIndex, onChange, idBase){
     const wrap = document.createElement('div');
     wrap.className = 'knob-wrap';
-    const idx = selectedIndex>=0?selectedIndex:0;
+    let idx = selectedIndex>=0?selectedIndex:0;
     wrap.innerHTML = `
-      <div class="knob-dial" style="--fill:${knobFill(idx, options.length)}deg">
+      <div class="knob-dial" id="${idBase}-dial" tabindex="0" role="slider"
+           aria-label="${labelText}" aria-valuemin="0" aria-valuemax="${options.length-1}" aria-valuenow="${idx}"
+           style="--fill:${knobFill(idx, options.length)}deg">
         <div class="knob-track"></div>
         <div class="knob-fill"></div>
         <div class="knob-ticks">
@@ -831,22 +1021,65 @@ input[type=file]{display:none;}
         </div>
         <div class="knob" id="${idBase}-knob"><div class="pointer" style="--rot:${knobAngle(idx, options.length)}deg"></div></div>
       </div>
-      <select class="knob-select" id="${idBase}-select">
-        ${options.map((o,i)=>`<option value="${i}" ${i===idx?'selected':''}>${o.label}</option>`).join('')}
-      </select>
       <div class="knob-label" id="${idBase}-label">${options[idx].label}</div>
     `;
-    const select = wrap.querySelector('select');
     const dial = wrap.querySelector('.knob-dial');
     const pointer = wrap.querySelector('.pointer');
     const labelEl = wrap.querySelector(`#${idBase}-label`);
-    select.addEventListener('change', ()=>{
-      const i = parseInt(select.value,10);
-      pointer.style.setProperty('--rot', knobAngle(i, options.length)+'deg');
-      dial.style.setProperty('--fill', knobFill(i, options.length)+'deg');
-      labelEl.textContent = options[i].label;
-      onChange(i);
+
+    function setIndex(i){
+      i = Math.max(0, Math.min(options.length-1, i));
+      if (i === idx) return;
+      idx = i;
+      pointer.style.setProperty('--rot', knobAngle(idx, options.length)+'deg');
+      dial.style.setProperty('--fill', knobFill(idx, options.length)+'deg');
+      labelEl.textContent = options[idx].label;
+      dial.setAttribute('aria-valuenow', idx);
+      onChange(idx);
+    }
+
+    const SENS = 12; // px of vertical drag per step
+    let dragging = false, startY = 0, startIdx = 0;
+
+    function onMove(e){
+      if (!dragging) return;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const steps = Math.round((startY - clientY) / SENS);
+      setIndex(startIdx + steps);
+      e.preventDefault();
+    }
+    function onUp(){
+      if (!dragging) return;
+      dragging = false;
+      dial.classList.remove('dragging');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    }
+    function onDown(e){
+      dragging = true;
+      startY = e.touches ? e.touches[0].clientY : e.clientY;
+      startIdx = idx;
+      dial.classList.add('dragging');
+      dial.focus();
+      window.addEventListener('mousemove', onMove, {passive:false});
+      window.addEventListener('mouseup', onUp);
+      window.addEventListener('touchmove', onMove, {passive:false});
+      window.addEventListener('touchend', onUp);
+      e.preventDefault();
+    }
+    dial.addEventListener('mousedown', onDown);
+    dial.addEventListener('touchstart', onDown, {passive:false});
+    dial.addEventListener('keydown', (e)=>{
+      if (e.key==='ArrowUp' || e.key==='ArrowRight'){ setIndex(idx+1); e.preventDefault(); }
+      else if (e.key==='ArrowDown' || e.key==='ArrowLeft'){ setIndex(idx-1); e.preventDefault(); }
     });
+    dial.addEventListener('wheel', (e)=>{
+      setIndex(idx + (e.deltaY < 0 ? 1 : -1));
+      e.preventDefault();
+    }, {passive:false});
+
     return wrap;
   }
 
@@ -878,6 +1111,20 @@ input[type=file]{display:none;}
   });
   fileInput.addEventListener('change', (e)=>{ if(e.target.files[0]) loadFile(e.target.files[0]); });
 
+  // ---------------- Timeline scrubbing ----------------
+  const waveformCanvas = document.getElementById('waveformCanvas');
+  waveformCanvas.addEventListener('click', (e)=>{
+    if (!state.audioBuffer) return;
+    const rect = waveformCanvas.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const t = frac * state.audioBuffer.duration;
+    const wasPlaying = playing;
+    if (wasPlaying) stopAll();
+    state.playOffset = t;
+    drawTimeline();
+    if (wasPlaying) startPlayback();
+  });
+
   async function loadFile(file){
     try{
       const c = getCtx();
@@ -886,7 +1133,25 @@ input[type=file]{display:none;}
       state.audioBuffer = audioBuffer;
       state.sampleRate = audioBuffer.sampleRate;
       state.vocalMono = null; state.instrumentalMono = null;
+      state.playOffset = 0; state.playStartCtxTime = null;
       fileNameDisplay.textContent = file.name || 'recording';
+
+      // dropzone metadata + mini waveform
+      const dur = audioBuffer.duration;
+      const chLabel = audioBuffer.numberOfChannels === 1 ? 'mono' : 'stereo';
+      const khz = (audioBuffer.sampleRate/1000).toFixed(1);
+      const warnHtml = dur > 300 ? ` <span class="warn">⚠ long file — processing may take a while</span>` : '';
+      document.getElementById('fileMeta').innerHTML = `${fmtTime(dur)} • ${khz}kHz • ${chLabel}${warnHtml}`;
+      const dropCanvas = document.getElementById('dropWaveform');
+      dropCanvas.style.display = 'block';
+      dropCanvas.width = dropCanvas.clientWidth || 220;
+      const dropPeaks = computePeaks(audioBuffer, 90);
+      drawPeaksBars(dropCanvas.getContext('2d'), dropCanvas.width, dropCanvas.height, dropPeaks, '#8a93ad');
+
+      // main timeline waveform
+      waveformPeaks = computePeaks(audioBuffer, 320);
+      resizeTimelineCanvas();
+
       if (!channels.length) initChannels();
       channels.forEach(ch=>{ ch.buffer=null; ch.monoData=null; setStatus(ch.id, ch.id==='lead'||ch.id==='backing' ? 'not split' : 'not rendered'); });
       document.getElementById('keyReadout').textContent = '— — —';
@@ -940,13 +1205,25 @@ input[type=file]{display:none;}
   const splitBulb = document.getElementById('splitBulb');
   const splitCaption = document.getElementById('splitCaption');
 
-  splitLever.addEventListener('click', ()=>{
+  splitLever.addEventListener('click', async ()=>{
     if (!state.audioBuffer) return alert('Load a file first.');
     splitLever.classList.add('on');
     splitBulb.classList.add('lit-amber');
-    splitCaption.innerHTML = 'ISOLATING…';
-    setTimeout(()=>{
-      const { vocal, instrumental } = Engine.isolateVocal(state.audioBuffer);
+    splitCaption.innerHTML = 'ISOLATING… 0%';
+    showProgress('split', 0);
+
+    const buffer = state.audioBuffer;
+    const length = buffer.length;
+    let left, right;
+    if (buffer.numberOfChannels > 1){
+      left = buffer.getChannelData(0).slice();
+      right = buffer.getChannelData(1).slice();
+    } else {
+      left = buffer.getChannelData(0).slice();
+      right = new Float32Array(length);
+    }
+
+    function finish(vocal, instrumental){
       state.vocalMono = vocal; state.instrumentalMono = instrumental;
       const lead = channels.find(c=>c.id==='lead');
       const backing = channels.find(c=>c.id==='backing');
@@ -956,8 +1233,21 @@ input[type=file]{display:none;}
       setStatus('backing', '● split');
       splitBulb.classList.remove('lit-amber'); splitBulb.classList.add('lit-green');
       splitCaption.innerHTML = 'SPLIT<br>DONE';
+      hideProgress('split');
       runKeyDetect();
-    }, 250);
+    }
+
+    try{
+      const msg = await runDSPTask({type:'isolate', left, right, length}, (pct)=>{
+        splitCaption.innerHTML = 'ISOLATING… ' + pct + '%';
+        showProgress('split', pct);
+      });
+      finish(msg.vocal, msg.instrumental);
+    }catch(err){
+      // fall back to synchronous main-thread processing if workers are unavailable
+      const { vocal, instrumental } = Engine.isolateVocal(state.audioBuffer);
+      finish(vocal, instrumental);
+    }
   });
 
   function runKeyDetect(){
@@ -974,24 +1264,46 @@ input[type=file]{display:none;}
   async function generateHarmony(chId){
     if (!state.vocalMono) return alert('Split the vocals first.');
     const ch = channels.find(c=>c.id===chId);
-    setStatus(chId, 'RENDERING…');
-    await new Promise(r=>setTimeout(r, 20));
-    const shifted = Engine.pitchShift(state.vocalMono, ch.intervalSemis, state.sampleRate);
-    ch.monoData = shifted;
-    ch.buffer = Engine.monoToBuffer(shifted, state.sampleRate);
-    setStatus(chId, '● rendered');
+    setStatus(chId, 'RENDERING… 0%');
+    showProgress(chId, 0);
+    const inputCopy = state.vocalMono.slice();
+    try{
+      const msg = await runDSPTask({type:'pitchShift', input: inputCopy, semitones: ch.intervalSemis, length: inputCopy.length}, (pct)=>{
+        setStatus(chId, 'RENDERING… ' + pct + '%');
+        showProgress(chId, pct);
+      });
+      ch.monoData = msg.output;
+      ch.buffer = Engine.monoToBuffer(msg.output, state.sampleRate);
+      setStatus(chId, '● rendered');
+      hideProgress(chId);
+    }catch(err){
+      // fall back to synchronous main-thread processing if workers are unavailable
+      const shifted = Engine.pitchShift(state.vocalMono, ch.intervalSemis, state.sampleRate);
+      ch.monoData = shifted;
+      ch.buffer = Engine.monoToBuffer(shifted, state.sampleRate);
+      setStatus(chId, '● rendered');
+      hideProgress(chId);
+    }
   }
 
   // ---------------- Transport ----------------
+  function currentPlayheadTime(){
+    if (playing && state.playStartCtxTime != null){
+      return state.playOffsetAtStart + (getCtx().currentTime - state.playStartCtxTime);
+    }
+    return state.playOffset || 0;
+  }
   function stopAll(){
+    if (playing) state.playOffset = currentPlayheadTime();
     channels.forEach(ch=>{ if (ch.sourceNode){ try{ch.sourceNode.stop();}catch(e){} ch.sourceNode=null; } });
     playing = false;
   }
-  document.getElementById('playAllBtn').addEventListener('click', ()=>{
+  function startPlayback(){
     if (!state.audioBuffer) return alert('Load and split a file first.');
     stopAll();
     const c = getCtx();
     const startAt = c.currentTime + 0.12;
+    const offset = Math.max(0, Math.min(state.playOffset || 0, state.audioBuffer.duration));
     let any = false;
     channels.forEach(ch=>{
       if (!ch.buffer) return;
@@ -999,13 +1311,23 @@ input[type=file]{display:none;}
       const src = c.createBufferSource();
       src.buffer = ch.buffer;
       src.connect(ch.gainNode);
-      src.start(startAt);
+      const off = Math.min(offset, ch.buffer.duration);
+      src.start(startAt, off);
       ch.sourceNode = src;
-      src.onended = ()=>{ ch.sourceNode = null; };
+      src.onended = ()=>{
+        ch.sourceNode = null;
+        if (playing && !channels.some(c2=>c2.sourceNode)){
+          playing = false;
+          state.playOffset = 0;
+        }
+      };
     });
-    if (!any) return alert('Nothing rendered yet — split the vocals and generate at least one part.');
+    if (!any){ alert('Nothing rendered yet — split the vocals and generate at least one part.'); return; }
     playing = true;
-  });
+    state.playStartCtxTime = startAt;
+    state.playOffsetAtStart = offset;
+  }
+  document.getElementById('playAllBtn').addEventListener('click', startPlayback);
   document.getElementById('stopAllBtn').addEventListener('click', stopAll);
 
   // ---------------- VU meters ----------------
@@ -1020,6 +1342,7 @@ input[type=file]{display:none;}
       for (let i=0;i<data.length;i++) peak = Math.max(peak, Math.abs(data[i]-128)/128);
       el.style.height = Math.min(100, peak*130) + '%';
     });
+    drawTimeline();
     requestAnimationFrame(vuLoop);
   }
   requestAnimationFrame(vuLoop);
@@ -1133,6 +1456,7 @@ input[type=file]{display:none;}
 
   initChannels();
   renderRack();
+  resizeTimelineCanvas();
 
 })();
 </script>
