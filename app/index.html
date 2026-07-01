@@ -1317,6 +1317,9 @@ self.onmessage = function(e){
       state.sampleRate = audioBuffer.sampleRate;
       state.vocalMono = null; state.instrumentalMono = null;
       state.playOffset = 0; state.playStartCtxTime = null;
+      state.loopStart = null; state.loopEnd = null; state.loopActive = false;
+      channels.forEach(ch=>stopTonePreview(ch));
+      updateLoopUI();
       fileNameDisplay.textContent = file.name || 'recording';
 
       // dropzone metadata + mini waveform
