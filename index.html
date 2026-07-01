@@ -232,6 +232,31 @@ section{padding:70px 0;}
 .step-card h3{font-size:18px;margin-bottom:8px;}
 .step-card p{color:var(--ink-soft);font-size:14px;margin:0;}
 
+.kbd{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  background:var(--surface-sunken);border-radius:6px;padding:2px 7px;
+  box-shadow:inset 2px 2px 4px var(--shadow-dark), inset -2px -2px 4px var(--shadow-light);
+  color:var(--ink);white-space:nowrap;
+}
+.tips-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:8px;}
+.tip-tile{
+  border-radius:18px;padding:20px 22px;
+  background:var(--surface-sunken);
+  box-shadow:inset 5px 5px 11px var(--shadow-dark), inset -5px -5px 11px var(--shadow-light);
+}
+.tip-tile h4{
+  font-family:'Manrope',sans-serif;font-weight:800;font-size:13px;
+  color:var(--ink);margin:0 0 8px;display:flex;align-items:center;gap:8px;
+}
+.tip-tile h4 .glyph{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  background:var(--iridescent);background-size:300% 300%;
+  animation:shimmer 9s ease-in-out infinite;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:#fff;
+}
+.tip-tile p{color:var(--ink-soft);font-size:13.5px;margin:0;line-height:1.6;}
+
 /* ---------- features ---------- */
 .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;}
 .feature-tile{
@@ -333,6 +358,7 @@ footer{padding:50px 0 60px;}
     <div class="wordmark"><span class="dot"></span>Harmony Deck</div>
     <div class="nav-links">
       <a href="#how">How it works</a>
+      <a href="#tips">Tips</a>
       <a href="#features">Features</a>
       <a href="#cloud">Cloud AI</a>
       <a href="https://github.com/Alex-Almanzar/HarmonizerV1Beta">GitHub</a>
@@ -388,24 +414,64 @@ footer{padding:50px 0 60px;}
 
   <section id="how">
     <div class="section-head">
-      <h2>Three steps, in order</h2>
-      <p>Each stage needs the one before it — you can't harmonize a part that hasn't been isolated yet, or mix a part that hasn't been generated.</p>
+      <h2>How to use Harmony Deck</h2>
+      <p>Six steps from raw recording to a mixed harmony stack. Each stage needs the one before it — you can't harmonize a part that hasn't been isolated yet, or mix a part that hasn't been generated.</p>
     </div>
     <div class="steps-grid">
       <div class="step-card">
         <span class="step-num">01</span>
-        <h3>Split</h3>
-        <p>Drop in a recording. Mid/side processing pulls your vocal from the mix using center-channel extraction.</p>
+        <h3>Load your vocal</h3>
+        <p>Drop an audio file onto the Tape Machine panel, or hit <b>● Record</b> to capture straight from your mic. You'll see the track's length, sample rate, and a mini waveform right away.</p>
       </div>
       <div class="step-card">
         <span class="step-num">02</span>
-        <h3>Harmonize</h3>
-        <p>The key gets detected automatically. Each part is your isolated vocal, pitch-shifted to the right interval — not a synth voice.</p>
+        <h3>Isolate the vocal</h3>
+        <p>Flip the <b>Isolate Vocal</b> switch. A progress bar tracks the split in real time (it runs off the main thread, so the UI stays responsive), and your key is auto-detected once it's done.</p>
       </div>
       <div class="step-card">
         <span class="step-num">03</span>
-        <h3>Mix &amp; export</h3>
-        <p>Fade, mute, solo, and tone-shape every part on the rack. Bounce stems or a finished master as WAV.</p>
+        <h3>Dial in each part</h3>
+        <p>On the mixer rack, click‑and‑drag a knob <i>vertically</i> to change it — Interval sets the harmony distance, Tone shapes the EQ character and previews live as you turn it. Click <b>Generate</b> to render.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">04</span>
+        <h3>Mix the rack</h3>
+        <p>Faders, Mute, and Solo work per channel. Solo any part and the others dim so it's obvious what's actually audible.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">05</span>
+        <h3>Scrub &amp; loop</h3>
+        <p>Click the waveform above the rack to jump anywhere in the track. Drag across a section to set a loop region — great for repeating one phrase while you audition harmonies.</p>
+      </div>
+      <div class="step-card">
+        <span class="step-num">06</span>
+        <h3>Export</h3>
+        <p>Bounce a finished <b>Master (WAV)</b> or every part as individual <b>Stems (ZIP)</b>, straight from the browser — no upload, nothing leaves your machine.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tips">
+    <div class="section-head">
+      <h2>Tips &amp; shortcuts</h2>
+      <p>A few things that aren't obvious the first time you sit down at the rack.</p>
+    </div>
+    <div class="tips-grid">
+      <div class="tip-tile">
+        <h4><span class="glyph">↕</span>Knobs drag, not click</h4>
+        <p>Every knob responds to a vertical click‑and‑drag (or scroll, or arrow keys when focused) — there's no dropdown hiding underneath. Small movements = fine adjustments.</p>
+      </div>
+      <div class="tip-tile">
+        <h4><span class="glyph">⟲</span>Loop a phrase</h4>
+        <p>Drag across the waveform to mark a loop region — playback will repeat it automatically. A single click instead just seeks. Use <b>✕ Clear Loop</b> to remove it.</p>
+      </div>
+      <div class="tip-tile">
+        <h4><span class="glyph">↺</span>Undo everything</h4>
+        <p>Knob turns, fader moves, mute/solo toggles — all undoable via the <span class="kbd">Ctrl/Cmd</span>+<span class="kbd">Z</span> shortcut or the Undo button. Redo with <span class="kbd">Shift</span>+<span class="kbd">Z</span>.</p>
+      </div>
+      <div class="tip-tile">
+        <h4><span class="glyph">♪</span>Live tone preview</h4>
+        <p>Drag the Tone knob on a part that's already been generated and you'll hear the EQ character change immediately — no need to hit Generate again just to audition a tone.</p>
       </div>
     </div>
   </section>
