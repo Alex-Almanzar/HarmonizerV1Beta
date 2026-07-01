@@ -348,15 +348,51 @@ body{
 
 .gen-btn{width:100%;}
 
-/* ---- Collaboration bridge ---- */
-.bridge-row{display:flex;flex-wrap:wrap;gap:14px;}
-.bridge-slot{
-  flex:1 1 150px;
-  background:var(--surface);border-radius:16px;
-  padding:14px;display:flex;flex-direction:column;align-items:center;gap:10px;
-  box-shadow:6px 6px 12px var(--shadow-dark), -6px -6px 12px var(--shadow-light);
+/* ---- Dynamic Bento Grid (Cloud AI Voice Engine + Collaboration Bridge) ---- */
+.bento-grid{display:flex;flex-wrap:wrap;gap:16px;align-items:stretch;}
+#bridgeRow{display:contents;} /* slots injected here become direct bento-grid items */
+.bento-cell{
+  background:var(--surface);
+  border-radius:20px;
+  padding:20px;
+  box-shadow:7px 7px 15px var(--shadow-dark), -7px -7px 15px var(--shadow-light);
+  transition:flex-grow .45s cubic-bezier(.22,1,.36,1), transform .45s cubic-bezier(.22,1,.36,1),
+             opacity .35s ease, box-shadow .35s ease, filter .35s ease;
+  outline:none;
+  min-width:0;
+  display:flex;flex-direction:column;gap:4px;
 }
-.bridge-slot .name{font-size:11px;letter-spacing:1px;font-weight:700;color:var(--ink);}
+.bento-cell.bento-xl{flex:2.4 1 300px;}
+.bento-cell.bento-lg{flex:1.7 1 240px;}
+.bento-cell.bento-md{flex:1.2 1 190px;}
+.bento-cell.bento-sm{flex:0.85 1 128px;align-items:center;text-align:center;justify-content:center;}
+.bento-cell .name{font-size:11px;letter-spacing:1px;font-weight:700;color:var(--ink);}
+
+.bento-cell-label{
+  font-family:'Manrope',sans-serif;font-weight:800;font-size:12px;letter-spacing:.6px;
+  color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.bento-tag{
+  font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9px;letter-spacing:.5px;
+  color:var(--ink-soft);text-transform:uppercase;background:var(--surface-sunken);
+  border-radius:6px;padding:2px 7px;
+}
+.bento-copy{font-size:12px;line-height:1.6;color:var(--ink-soft);margin:0 0 10px;}
+
+/* fluid shifting focus: hovering/focusing a cell grows & sharpens it, dims & shrinks the rest */
+.bento-grid.has-focus .bento-cell{opacity:.5;filter:saturate(.6);transform:scale(.965);}
+.bento-grid.has-focus .bento-cell.is-focused{
+  opacity:1;filter:none;transform:scale(1.025) translateY(-2px);
+  flex-grow:4;
+  box-shadow:14px 14px 30px var(--shadow-dark), -12px -12px 26px var(--shadow-light);
+  z-index:4;
+}
+@media (max-width:760px){
+  .bento-cell.bento-xl, .bento-cell.bento-lg, .bento-cell.bento-md{flex-basis:100%;}
+}
+@media (prefers-reduced-motion: reduce){
+  .bento-cell{transition:none;}
+}
 
 /* ---- Master ---- */
 .master-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
@@ -394,6 +430,8 @@ input[type=file]{display:none;}
 .timeline-readout b{color:var(--accent-deep);font-weight:700;}
 .loop-readout{color:var(--accent-deep);font-weight:700;}
 .timeline-hint{text-align:center;font-size:10px;color:var(--ink-soft);letter-spacing:.4px;margin-top:6px;opacity:.75;}
+.timeline-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;}
+.zoom-level{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);min-width:38px;text-align:center;}
 
 .bridge-slot-label{
   display:block;font-family:'Manrope',sans-serif;font-weight:700;font-size:10px;letter-spacing:1.5px;
@@ -507,13 +545,19 @@ input[type=file]{display:none;}
   <div class="panel">
     <div class="panel-label">Harmony Mixer — Lead / Soprano / Alto / Tenor / Backing</div>
     <div class="timeline-wrap">
+      <div class="timeline-toolbar">
+        <button class="btn small" id="zoomOutBtn" title="Zoom out">−</button>
+        <span class="zoom-level" id="zoomLevel">100%</span>
+        <button class="btn small" id="zoomInBtn" title="Zoom in">+</button>
+        <button class="btn small" id="zoomFitBtn" title="Reset zoom to fit whole track">⤢ Fit</button>
+      </div>
       <canvas class="timeline-canvas" id="waveformCanvas" height="64"></canvas>
       <div class="timeline-readout">
         <b id="timeCurrent">0:00</b><span>/</span><span id="timeTotal">0:00</span>
         <span class="loop-readout" id="loopReadout"></span>
         <button class="btn small" id="clearLoopBtn" style="display:none;">✕ Clear Loop</button>
       </div>
-      <div class="timeline-hint">Click to seek • Drag across the waveform to set a loop region</div>
+      <div class="timeline-hint">Click to seek • Drag to set a loop region • Scroll to zoom</div>
     </div>
     <div class="rack" id="rack"></div>
     <div class="master-row" style="margin-top:16px;">
@@ -725,14 +769,28 @@ input[type=file]{display:none;}
     }
     return out;
   }
-  function computePeaks(buffer, numBuckets){
-    const data = buffer.numberOfChannels>1 ? mixDown(buffer) : buffer.getChannelData(0);
+  function computePeaks(data, numBuckets){
     const bucketSize = Math.max(1, Math.floor(data.length/numBuckets));
     const peaks = new Float32Array(numBuckets);
     for (let i=0;i<numBuckets;i++){
       let max = 0;
       const start = i*bucketSize, end = Math.min(data.length, start+bucketSize);
       for (let j=start;j<end;j++){ const v = Math.abs(data[j]); if (v>max) max=v; }
+      peaks[i] = max;
+    }
+    return peaks;
+  }
+  // Peaks for a specific time range, at a given resolution — used for zoomed-in views.
+  function computePeaksRange(data, sampleRate, startSec, endSec, numBuckets){
+    const startIdx = Math.max(0, Math.floor(startSec*sampleRate));
+    const endIdx = Math.min(data.length, Math.ceil(endSec*sampleRate));
+    const span = Math.max(1, endIdx-startIdx);
+    const bucketSize = Math.max(1, Math.floor(span/numBuckets));
+    const peaks = new Float32Array(numBuckets);
+    for (let i=0;i<numBuckets;i++){
+      let max = 0;
+      const s = startIdx + i*bucketSize, e = Math.min(endIdx, s+bucketSize);
+      for (let j=s;j<e;j++){ const v = Math.abs(data[j]); if (v>max) max=v; }
       peaks[i] = max;
     }
     return peaks;
@@ -751,10 +809,59 @@ input[type=file]{display:none;}
 
   let waveformPeaks = null;
 
+  // ---------------- Timeline zoom / pan ----------------
+  function currentViewWindow(){
+    if (!state.audioBuffer) return [0, 1];
+    const dur = state.audioBuffer.duration;
+    let vs = state.viewStart == null ? 0 : state.viewStart;
+    let ve = state.viewEnd == null ? dur : state.viewEnd;
+    if (ve - vs < 0.05) ve = vs + 0.05;
+    vs = Math.max(0, vs); ve = Math.min(dur, ve);
+    return [vs, ve];
+  }
+  function refreshViewPeaks(){
+    if (!state.audioBuffer || !state.monoWaveform) { waveformPeaks = null; return; }
+    const [vs, ve] = currentViewWindow();
+    const canvas = document.getElementById('waveformCanvas');
+    const buckets = Math.max(60, Math.min(600, (canvas && canvas.width) || 320));
+    waveformPeaks = computePeaksRange(state.monoWaveform, state.sampleRate, vs, ve, buckets);
+  }
+  function updateZoomUI(){
+    const label = document.getElementById('zoomLevel');
+    if (!label || !state.audioBuffer) return;
+    const dur = state.audioBuffer.duration;
+    const [vs, ve] = currentViewWindow();
+    label.textContent = Math.round((dur/(ve-vs))*100) + '%';
+  }
+  function zoomTimeline(factor, centerOverride){
+    if (!state.audioBuffer) return;
+    const dur = state.audioBuffer.duration;
+    const [vs, ve] = currentViewWindow();
+    const center = centerOverride != null ? centerOverride : (playing ? currentPlayheadTime() : (vs+ve)/2);
+    const minWidth = Math.min(dur, Math.max(0.4, dur*0.01));
+    const width = Math.max(minWidth, Math.min(dur, (ve-vs)*factor));
+    let newStart = center - width/2, newEnd = center + width/2;
+    if (newStart < 0){ newEnd -= newStart; newStart = 0; }
+    if (newEnd > dur){ newStart -= (newEnd-dur); newEnd = dur; }
+    state.viewStart = Math.max(0, newStart);
+    state.viewEnd = Math.min(dur, newEnd);
+    refreshViewPeaks();
+    drawTimeline();
+    updateZoomUI();
+  }
+  function zoomFit(){
+    if (!state.audioBuffer) return;
+    state.viewStart = 0; state.viewEnd = state.audioBuffer.duration;
+    refreshViewPeaks();
+    drawTimeline();
+    updateZoomUI();
+  }
+
   function resizeTimelineCanvas(){
     const canvas = document.getElementById('waveformCanvas');
     if (!canvas || !canvas.clientWidth) return;
     canvas.width = canvas.clientWidth;
+    if (state.audioBuffer) refreshViewPeaks();
     drawTimeline();
   }
   window.addEventListener('resize', resizeTimelineCanvas);
@@ -767,18 +874,36 @@ input[type=file]{display:none;}
     drawPeaksBars(ctx2d, w, h, waveformPeaks, '#6c79ef');
     if (state.audioBuffer){
       const dur = state.audioBuffer.duration;
+      const [vs, ve] = currentViewWindow();
+      const viewSpan = Math.max(0.0001, ve - vs);
 
-      if (state.loopStart != null && state.loopEnd != null && dur > 0){
-        const x1 = (state.loopStart/dur)*w, x2 = (state.loopEnd/dur)*w;
-        ctx2d.fillStyle = 'rgba(108,121,239,0.16)';
-        ctx2d.fillRect(x1, 0, x2-x1, h);
-        ctx2d.strokeStyle = 'rgba(108,121,239,0.55)';
-        ctx2d.lineWidth = 1;
-        ctx2d.strokeRect(x1+0.5, 0.5, Math.max(1,x2-x1-1), h-1);
+      if (state.loopStart != null && state.loopEnd != null){
+        const ls = Math.max(vs, state.loopStart), le = Math.min(ve, state.loopEnd);
+        if (le > ls){
+          const x1 = ((ls-vs)/viewSpan)*w, x2 = ((le-vs)/viewSpan)*w;
+          ctx2d.fillStyle = 'rgba(108,121,239,0.16)';
+          ctx2d.fillRect(x1, 0, x2-x1, h);
+          ctx2d.strokeStyle = 'rgba(108,121,239,0.55)';
+          ctx2d.lineWidth = 1;
+          ctx2d.strokeRect(x1+0.5, 0.5, Math.max(1,x2-x1-1), h-1);
+        }
       }
 
       const t = currentPlayheadTime();
-      const frac = dur>0 ? Math.min(1, t/dur) : 0;
+
+      // auto-follow the playhead when zoomed in and it scrolls out of the visible window
+      if (playing && (t < vs || t > ve) && viewSpan < dur - 0.01){
+        let newStart = t - viewSpan/2, newEnd = t + viewSpan/2;
+        if (newStart < 0){ newEnd -= newStart; newStart = 0; }
+        if (newEnd > dur){ newStart -= (newEnd-dur); newEnd = dur; }
+        state.viewStart = Math.max(0, newStart);
+        state.viewEnd = Math.min(dur, newEnd);
+        refreshViewPeaks();
+        drawTimeline();
+        return;
+      }
+
+      const frac = Math.max(0, Math.min(1, (t-vs)/viewSpan));
       ctx2d.strokeStyle = '#ef7f7f';
       ctx2d.lineWidth = 2;
       ctx2d.beginPath();
@@ -787,14 +912,6 @@ input[type=file]{display:none;}
       ctx2d.stroke();
       document.getElementById('timeCurrent').textContent = fmtTime(t);
       document.getElementById('timeTotal').textContent = fmtTime(dur);
-
-      // loop playback: jump back to loop start once we pass loop end
-      if (playing && state.loopActive && state.loopEnd != null && state.loopEnd - state.loopStart > 0.05){
-        if (t >= state.loopEnd - 0.03){
-          state.playOffset = state.loopStart;
-          startPlayback();
-        }
-      }
     }
   }
   function updateLoopUI(){
@@ -924,7 +1041,7 @@ self.onmessage = function(e){
     {id:'backing', label:'BACKING', hasInterval:false, hasTone:false, defaultFader:0.7},
   ];
 
-  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null, playOffset:0, playStartCtxTime:null, playOffsetAtStart:0, loopStart:null, loopEnd:null, loopActive:false };
+  const state = { audioBuffer:null, sampleRate:44100, vocalMono:null, instrumentalMono:null, playOffset:0, playStartCtxTime:null, playOffsetAtStart:0, loopStart:null, loopEnd:null, loopActive:false, monoWaveform:null, viewStart:null, viewEnd:null };
   let channels = [];
   let masterGain = null;
   let playing = false;
@@ -1026,14 +1143,32 @@ self.onmessage = function(e){
   });
 
   // ---------------- Live tone preview ----------------
+  // Falls back to the isolated vocal if this part hasn't been rendered yet, so turning
+  // the Tone knob is audible even before hitting Generate. Routes through a dedicated
+  // preview gain straight into the channel's filter (bypassing fader/mute/solo) so the
+  // preview is always audible regardless of mixer state, and skips entirely if this
+  // channel is already sounding as part of the live mix (applyTone already updates that
+  // in real time — no second source needed).
+  function tonePreviewSourceBuffer(ch){
+    if (ch.buffer) return ch.buffer;
+    if (state.vocalMono) return Engine.monoToBuffer(state.vocalMono, state.sampleRate);
+    return null;
+  }
   function startTonePreview(ch){
-    if (playing || !ch.buffer) return; // mix already playing through this chain — nothing extra needed
+    if (ch.sourceNode) return; // already audible live in the mix; applyTone updates it directly
+    const buf = tonePreviewSourceBuffer(ch);
+    if (!buf) return;
     stopTonePreview(ch);
     const c = getCtx();
+    if (!ch.previewGain){
+      ch.previewGain = c.createGain();
+      ch.previewGain.gain.value = 0.85;
+      ch.previewGain.connect(ch.filterNode);
+    }
     const src = c.createBufferSource();
-    src.buffer = ch.buffer;
+    src.buffer = buf;
     src.loop = true;
-    src.connect(ch.gainNode);
+    src.connect(ch.previewGain);
     src.start();
     ch.previewNode = src;
   }
@@ -1254,9 +1389,11 @@ self.onmessage = function(e){
 
   // ---------------- Timeline scrubbing ----------------
   const waveformCanvas = document.getElementById('waveformCanvas');
-  function timelineFracFromEvent(e, rect){
+  function timelineTimeFromEvent(e, rect){
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const [vs, ve] = currentViewWindow();
+    return vs + frac*(ve-vs);
   }
   function seekTo(t){
     const wasPlaying = playing;
@@ -1268,20 +1405,20 @@ self.onmessage = function(e){
   function startTimelinePointer(e){
     if (!state.audioBuffer) return;
     const rect = waveformCanvas.getBoundingClientRect();
-    const startFrac = timelineFracFromEvent(e, rect);
+    const startTime = timelineTimeFromEvent(e, rect);
+    const [vs0, ve0] = currentViewWindow();
     let dragged = false;
     function onMove(e2){
-      const frac2 = timelineFracFromEvent(e2, rect);
-      if (Math.abs(frac2 - startFrac) > 0.008) dragged = true;
+      const t2 = timelineTimeFromEvent(e2, rect);
+      if (Math.abs(t2 - startTime) > (ve0-vs0)*0.008) dragged = true;
       if (dragged){
-        const a = Math.min(startFrac, frac2) * state.audioBuffer.duration;
-        const b = Math.max(startFrac, frac2) * state.audioBuffer.duration;
-        state.loopStart = a; state.loopEnd = b;
+        state.loopStart = Math.min(startTime, t2);
+        state.loopEnd = Math.max(startTime, t2);
         drawTimeline();
       }
       e2.preventDefault();
     }
-    function onEnd(e2){
+    function onEnd(){
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onEnd);
       window.removeEventListener('touchmove', onMove);
@@ -1291,7 +1428,7 @@ self.onmessage = function(e){
         updateLoopUI();
         drawTimeline();
       } else {
-        seekTo(startFrac * state.audioBuffer.duration);
+        seekTo(startTime);
       }
     }
     window.addEventListener('mousemove', onMove, {passive:false});
@@ -1301,10 +1438,20 @@ self.onmessage = function(e){
   }
   waveformCanvas.addEventListener('mousedown', startTimelinePointer);
   waveformCanvas.addEventListener('touchstart', startTimelinePointer, {passive:true});
+  waveformCanvas.addEventListener('wheel', (e)=>{
+    if (!state.audioBuffer) return;
+    e.preventDefault();
+    const rect = waveformCanvas.getBoundingClientRect();
+    const hoverTime = timelineTimeFromEvent(e, rect);
+    zoomTimeline(e.deltaY < 0 ? 0.72 : 1/0.72, hoverTime);
+  }, {passive:false});
   document.getElementById('clearLoopBtn').addEventListener('click', ()=>{
     state.loopActive = false; state.loopStart = null; state.loopEnd = null;
     updateLoopUI(); drawTimeline();
   });
+  document.getElementById('zoomInBtn').addEventListener('click', ()=>zoomTimeline(0.55));
+  document.getElementById('zoomOutBtn').addEventListener('click', ()=>zoomTimeline(1/0.55));
+  document.getElementById('zoomFitBtn').addEventListener('click', zoomFit);
   document.getElementById('undoBtn').addEventListener('click', undo);
   document.getElementById('redoBtn').addEventListener('click', redo);
 
@@ -1331,12 +1478,14 @@ self.onmessage = function(e){
       const dropCanvas = document.getElementById('dropWaveform');
       dropCanvas.style.display = 'block';
       dropCanvas.width = dropCanvas.clientWidth || 220;
-      const dropPeaks = computePeaks(audioBuffer, 90);
+      state.monoWaveform = audioBuffer.numberOfChannels > 1 ? mixDown(audioBuffer) : audioBuffer.getChannelData(0).slice();
+      const dropPeaks = computePeaks(state.monoWaveform, 90);
       drawPeaksBars(dropCanvas.getContext('2d'), dropCanvas.width, dropCanvas.height, dropPeaks, '#8a93ad');
 
-      // main timeline waveform
-      waveformPeaks = computePeaks(audioBuffer, 320);
+      // main timeline waveform — reset zoom to fit the whole track
+      state.viewStart = 0; state.viewEnd = dur;
       resizeTimelineCanvas();
+      updateZoomUI();
 
       if (!channels.length) initChannels();
       channels.forEach(ch=>{ ch.buffer=null; ch.monoData=null; setStatus(ch.id, ch.id==='lead'||ch.id==='backing' ? 'not split' : 'not rendered'); });
@@ -1484,12 +1633,18 @@ self.onmessage = function(e){
     channels.forEach(ch=>{ if (ch.sourceNode){ try{ch.sourceNode.stop();}catch(e){} ch.sourceNode=null; } });
     playing = false;
   }
-  function startPlayback(){
-    if (!state.audioBuffer) return alert('Load and split a file first.');
-    stopAll();
+  // Starts playback from a specific offset, assuming everything is already stopped.
+  // Sample-accurate loop handling: if a loop is active and the offset lands before
+  // the loop end, every source is scheduled with an explicit stop duration so it ends
+  // exactly at the loop boundary — then onended re-triggers playback from loopStart,
+  // giving a seamless, continuous loop instead of a polled/approximate one.
+  function beginPlaybackFromOffset(offset){
     const c = getCtx();
     const startAt = c.currentTime + 0.12;
-    const offset = Math.max(0, Math.min(state.playOffset || 0, state.audioBuffer.duration));
+    const clampedOffset = Math.max(0, Math.min(offset, state.audioBuffer.duration));
+    const loopValid = state.loopActive && state.loopStart != null && state.loopEnd != null && (state.loopEnd - state.loopStart) > 0.05;
+    const willLoop = loopValid && clampedOffset < state.loopEnd;
+    const stopDuration = willLoop ? Math.max(0.02, state.loopEnd - clampedOffset) : null;
     let any = false;
     channels.forEach(ch=>{
       if (!ch.buffer) return;
@@ -1497,21 +1652,40 @@ self.onmessage = function(e){
       const src = c.createBufferSource();
       src.buffer = ch.buffer;
       src.connect(ch.gainNode);
-      const off = Math.min(offset, ch.buffer.duration);
-      src.start(startAt, off);
+      const off = Math.min(clampedOffset, ch.buffer.duration);
+      if (stopDuration != null){
+        const remaining = Math.max(0, ch.buffer.duration - off);
+        src.start(startAt, off, Math.min(stopDuration, remaining || stopDuration));
+      } else {
+        src.start(startAt, off);
+      }
       ch.sourceNode = src;
       src.onended = ()=>{
         ch.sourceNode = null;
         if (playing && !channels.some(c2=>c2.sourceNode)){
-          playing = false;
-          state.playOffset = 0;
+          if (willLoop){
+            playing = false;
+            beginPlaybackFromOffset(state.loopStart);
+          } else {
+            playing = false;
+            state.playOffset = 0;
+          }
         }
       };
     });
-    if (!any){ alert('Nothing rendered yet — split the vocals and generate at least one part.'); return; }
+    if (!any) return false;
     playing = true;
     state.playStartCtxTime = startAt;
-    state.playOffsetAtStart = offset;
+    state.playOffsetAtStart = clampedOffset;
+    return true;
+  }
+  function startPlayback(){
+    if (!state.audioBuffer) return alert('Load and split a file first.');
+    const offset = state.playOffset || 0;
+    stopAll();
+    if (!beginPlaybackFromOffset(offset)){
+      alert('Nothing rendered yet — split the vocals and generate at least one part.');
+    }
   }
   document.getElementById('playAllBtn').addEventListener('click', startPlayback);
   document.getElementById('stopAllBtn').addEventListener('click', stopAll);
